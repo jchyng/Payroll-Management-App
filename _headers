@@ -20,6 +20,14 @@
   Content-Type: image/png
   Cache-Control: public, max-age=31536000, immutable
 
+/favicon-32.png
+  Content-Type: image/png
+  Cache-Control: public, max-age=31536000, immutable
+
+/favicon-16.png
+  Content-Type: image/png
+  Cache-Control: public, max-age=31536000, immutable
+
 # HTML - 캐시 안 함 (SW가 처리)
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
