@@ -1,7 +1,7 @@
 {
-  "name": "급여 주기 가계부",
-  "short_name": "급여가계부",
-  "description": "25일 급여일 기준 예산 관리 PWA",
+  "name": "Payroll Management",
+  "short_name": "Payroll M",
+  "description": "급여일 기준 예산 주기 관리 PWA",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f8fafc",
