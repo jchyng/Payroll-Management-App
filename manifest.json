@@ -5,22 +5,24 @@
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f8fafc",
-  "theme_color": "#0ea5e9",
+  "theme_color": "#0E8F73",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='96' fill='%230ea5e9'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' font-size='280'>💰</text></svg>",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='36' fill='%230ea5e9'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' font-size='110'>💰</text></svg>",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ],
   "categories": ["finance", "productivity"],
-  "lang": "ko-KR"
+  "lang": "ko-KR",
+  "screenshots": [],
+  "prefer_related_applications": false
 }

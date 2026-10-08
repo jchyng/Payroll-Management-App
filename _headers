@@ -1,0 +1,44 @@
+# Cloudflare Pages 헤더 설정 - PWA 지원
+
+# 매니페스트 - 올바른 MIME 타입
+/manifest.json
+  Content-Type: application/manifest+json
+  Cache-Control: public, max-age=0, must-revalidate
+
+# 서비스 워커 - 캐시 안 함 (항상 최신 버전)
+/sw.js
+  Content-Type: application/javascript
+  Service-Worker-Allowed: /
+  Cache-Control: public, max-age=0, must-revalidate
+
+# PNG 아이콘 - 긴 캐시
+/icon-192.png
+  Content-Type: image/png
+  Cache-Control: public, max-age=31536000, immutable
+
+/icon-512.png
+  Content-Type: image/png
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML - 캐시 안 함 (SW가 처리)
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# CSS/JS - 긴 캐시 (파일명에 해시 없으므로 주의)
+/style.css
+  Content-Type: text/css
+  Cache-Control: public, max-age=31536000, immutable
+
+/app.js
+  Content-Type: application/javascript
+  Cache-Control: public, max-age=31536000, immutable
+
+/db.js
+  Content-Type: application/javascript
+  Cache-Control: public, max-age=31536000, immutable
+
+# 보안 헤더
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
