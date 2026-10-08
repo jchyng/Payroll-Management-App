@@ -42,6 +42,8 @@ let selectedCat = 'food'; // 시트에서 선택된 카테고리
 
 /* ============ 유틸 ============ */
 const $ = (id) => document.getElementById(id);
+const setToggle = (id, on) => { const el = $(id); el.classList.toggle('on', on); el.setAttribute('aria-checked', on); };
+const getToggle = (id) => $(id).classList.contains('on');
 const pad = (n) => String(n).padStart(2, '0');
 const fmtDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const fmtKR = (d) => `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
@@ -314,7 +316,7 @@ async function renderAll() {
 
   const salaryButton = $('addIncomeBtn');
   const hasSalary = salaryForCycle(c) > 0;
-  salaryButton.textContent = hasSalary ? '급여 수정' : '＋ 급여 입력';
+  salaryButton.textContent = hasSalary ? '급여 수정' : '급여 입력';
   salaryButton.setAttribute('aria-label', hasSalary ? '급여 수정' : '급여 입력');
 
   // 지출 리스트
@@ -370,12 +372,15 @@ function renderExpenseGroup(listId, expenses, emptyMessage) {
 
 /* ============ 시트 공통 ============ */
 function openSheet(id) {
+  document.body.classList.add('modal-open');
   $('overlay').classList.add('on');
   $(id).classList.add('on');
 }
 function closeSheets() {
+  closeCalendar(false);
   $('overlay').classList.remove('on');
   document.querySelectorAll('.sheet').forEach(s => s.classList.remove('on'));
+  document.body.classList.remove('modal-open');
   editingId = null;
 }
 
@@ -395,14 +400,66 @@ function syncPayDayUI(day) {
 /* ============ 카테고리 칩 ============ */
 function buildCatChips() {
   $('catChips').innerHTML = CATEGORIES.map(c =>
-    `<button class="chip ${c.id === selectedCat ? 'on' : ''}" data-cat="${c.id}">${c.emoji} ${c.label}</button>`
+    `<button type="button" class="chip ${c.id === selectedCat ? 'on' : ''}" data-cat="${c.id}" aria-pressed="${c.id === selectedCat}">${c.emoji} ${c.label}</button>`
   ).join('');
   $('catChips').querySelectorAll('.chip').forEach(chip => {
     chip.addEventListener('click', () => {
       selectedCat = chip.dataset.cat;
-      $('catChips').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === chip));
+      $('catChips').querySelectorAll('.chip').forEach(x => {
+        const active = x === chip;
+        x.classList.toggle('on', active);
+        x.setAttribute('aria-pressed', active);
+      });
     });
   });
+}
+
+/* ============ 지출 날짜 선택 ============ */
+let calendarView = null;
+function setExpenseDate(value) {
+  $('expDate').value = value;
+  const date = parseDate(value);
+  const weekday = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+  $('expDateText').textContent = `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())} (${weekday})`;
+}
+
+function renderCalendar() {
+  const { year, month } = calendarView;
+  $('calendarMonth').textContent = `${year}년 ${month + 1}월`;
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const selected = $('expDate').value;
+  const today = fmtDate(new Date());
+  const blankDays = Array.from({ length: firstWeekday }, () => '<span aria-hidden="true"></span>');
+  const days = Array.from({ length: daysInMonth }, (_, index) => {
+    const day = index + 1;
+    const value = `${year}-${pad(month + 1)}-${pad(day)}`;
+    const classes = [value === today ? 'is-today' : '', value === selected ? 'is-selected' : ''].filter(Boolean).join(' ');
+    return `<button type="button" class="${classes}" data-date="${value}" aria-label="${year}년 ${month + 1}월 ${day}일" aria-pressed="${value === selected}">${day}</button>`;
+  });
+  $('calendarDays').innerHTML = [...blankDays, ...days].join('');
+}
+
+function openCalendar() {
+  const date = parseDate($('expDate').value || fmtDate(new Date()));
+  calendarView = { year: date.getFullYear(), month: date.getMonth() };
+  renderCalendar();
+  $('calendarOverlay').hidden = false;
+  $('expenseSheet').inert = true;
+  $('calendarClose').focus();
+}
+
+function closeCalendar(restoreFocus = true) {
+  if ($('calendarOverlay').hidden) return;
+  $('calendarOverlay').hidden = true;
+  $('expenseSheet').inert = false;
+  if (restoreFocus) $('expDateTrigger').focus();
+}
+
+function moveCalendarMonth(offset) {
+  const date = new Date(calendarView.year, calendarView.month + offset, 1);
+  calendarView = { year: date.getFullYear(), month: date.getMonth() };
+  renderCalendar();
 }
 
 /* ============ 지출 추가/수정 ============ */
@@ -413,15 +470,13 @@ function openAddExpense() {
   $('expFoot').style.display = 'none';
   $('expAmount').value = '';
   $('expName').value = '';
-  $('expDate').value = fmtDate(new Date());
-  $('expRecurring').checked = false;
+  setExpenseDate(fmtDate(new Date()));
+  setToggle('expRecurring', false);
   $('expRecurring').disabled = false;
-  $('recurringHint').hidden = true;
   $('expErr').textContent = '';
   selectedCat = 'food';
   buildCatChips();
   openSheet('expenseSheet');
-  setTimeout(() => $('expAmount').focus(), 250);
 }
 
 function openEditExpense(id) {
@@ -433,10 +488,10 @@ function openEditExpense(id) {
   $('expFoot').style.display = '';
   $('expAmount').value = formatAmountInput(e.amount);
   $('expName').value = e.name;
-  $('expDate').value = e.date;
-  $('expRecurring').checked = !!e.recurrenceId;
-  $('expRecurring').disabled = !!e.recurrenceId;
-  $('recurringHint').hidden = !e.recurrenceId;
+  setExpenseDate(e.date);
+  const isRecurring = !!e.recurrenceId;
+  setToggle('expRecurring', isRecurring);
+  $('expRecurring').disabled = isRecurring;
   $('expErr').textContent = '';
   selectedCat = e.category;
   buildCatChips();
@@ -456,7 +511,7 @@ async function saveNewExpense() {
   const f = readExpenseForm(); if (!f) return;
   const c = locateCycle(parseDate(f.date));
   const expense = { id: uid(), ...f, cycleKey: cycleKey(c), done: false };
-  if ($('expRecurring').checked) {
+  if (getToggle('expRecurring')) {
     const recurrenceId = uid();
     const day = parseDate(f.date).getDate();
     state.recurringExpenses.push({ id: recurrenceId, ...f, day, startDate: f.date });
@@ -499,6 +554,7 @@ function openIncome() {
   $('incAmount').value = formatAmountInput(override ? override.amount : salaryFor(c) || '');
   $('incErr').textContent = '';
   $('incReset').style.display = override ? '' : 'none';
+  syncPayDayUI(state.payDay);
   openSheet('incomeSheet');
   setTimeout(() => $('incAmount').focus(), 250);
 }
@@ -506,12 +562,22 @@ function openIncome() {
 async function saveIncome() {
   const amount = parseInt(digits($('incAmount').value), 10);
   if (!amount || amount <= 0) { $('incErr').textContent = '금액을 입력하세요'; return; }
-  const c = getViewCycle();
-  const existing = state.incomes.find(i => i.type === 'salary' && i.cycleKey === cycleKey(c));
-  if (existing) {
-    existing.amount = amount;
+  const activeChip = $('payDayChips').querySelector('.chip.on');
+  const payDay = activeChip ? parseInt(activeChip.dataset.val, 10) : 0;
+  if (!payDay) { $('incErr').textContent = '급여일을 선택하세요'; return; }
+
+  // 급여일이 바뀌었으면 다음 급여일부터 새 설정 적용
+  if (payDay !== state.payDay) {
+    updateSalarySettings(amount, payDay);
   } else {
-    state.incomes.push({ id: uid(), type: 'salary', amount, date: fmtDate(c.payDate), cycleKey: cycleKey(c) });
+    // 급여일 동일: 이번 주기 금액만 override
+    const c = getViewCycle();
+    const existing = state.incomes.find(i => i.type === 'salary' && i.cycleKey === cycleKey(c));
+    if (existing) {
+      existing.amount = amount;
+    } else {
+      state.incomes.push({ id: uid(), type: 'salary', amount, date: fmtDate(c.payDate), cycleKey: cycleKey(c) });
+    }
   }
   await saveState(); closeSheets(); await renderAll();
   toast(`${fmtMoney(amount)}원 급여 저장됨`);
@@ -524,39 +590,6 @@ async function resetIncome() {
   state.incomes = state.incomes.filter(i => !(i.type === 'salary' && i.cycleKey === cycleKey(c)));
   await saveState(); closeSheets(); await renderAll();
   toast('급여가 초기화되었습니다');
-}
-
-/* ============ 설정 ============ */
-function openSettings() {
-  $('salaryInput').value = formatAmountInput(configuredSalary() || '');
-  syncPayDayUI(state.payDay);
-  const hasDefaultSalary = configuredSalary() > 0;
-  $('settingsReset').style.display = hasDefaultSalary ? '' : 'none';
-  openSheet('settingsSheet');
-}
-
-async function saveSettings() {
-  const salary = parseInt(digits($('salaryInput').value), 10);
-  const activeChip = $('payDayChips').querySelector('.chip.on');
-  const payDay = activeChip ? parseInt(activeChip.dataset.val, 10) : 0;
-  if (!salary || salary <= 0) {
-    toast('월급 금액을 입력하세요');
-    return;
-  }
-  if (!payDay) {
-    toast('급여일을 선택하세요');
-    return;
-  }
-  updateSalarySettings(salary, payDay);
-  await saveState(); closeSheets(); await renderAll();
-  toast(`설정 저장 (매월 ${payDay}일 지급, 다음 급여일부터 적용)`);
-}
-
-async function resetSalarySettings() {
-  if (!confirm('설정된 기본 월급을 초기화할까요?\n매달 자동 적용되는 월급이 0원으로 리셋됩니다.')) return;
-  state.salaryHistory = [{ id: uid(), amount: 0, from: '0000-01-01' }];
-  await saveState(); closeSheets(); await renderAll();
-  toast('기본 월급이 초기화되었습니다');
 }
 
 /* ============ 주기 초기화 ============ */
@@ -590,42 +623,68 @@ async function navigate(dir) {
 
 /* ============ 초기화 ============ */
 async function init() {
-  await loadState();
+  try {
+    await loadState();
 
-  // 기본 뷰 = 현재 주기
-  const now = locateCycle(new Date());
-  view = { year: now.year, index: now.index };
+    // 기본 뷰 = 현재 주기
+    const now = locateCycle(new Date());
+    view = { year: now.year, index: now.index };
 
   // 칩 생성
   buildCatChips();
   buildPayDayChips();
 
   // 금액 입력: 숫자만
-  ['expAmount', 'incAmount', 'salaryInput'].forEach(id => {
+  ['expAmount', 'incAmount'].forEach(id => {
     $(id).addEventListener('input', (e) => formatAmountInputValue(e.target));
   });
 
   // 이벤트 바인딩
   $('prevCycle').addEventListener('click', () => navigate(-1));
   $('nextCycle').addEventListener('click', () => navigate(1));
-  $('settingsBtn').addEventListener('click', openSettings);
   $('addExpenseBtn').addEventListener('click', openAddExpense);
   $('addIncomeBtn').addEventListener('click', openIncome);
   $('clearBtn').addEventListener('click', clearCycle);
   $('expSave').addEventListener('click', saveNewExpense);
   $('expUpdate').addEventListener('click', updateExpense);
   $('expDelete').addEventListener('click', deleteExpense);
+  $('expClose').addEventListener('click', closeSheets);
+  $('expDateTrigger').addEventListener('click', openCalendar);
+  $('calendarClose').addEventListener('click', () => closeCalendar());
+  $('calendarPrev').addEventListener('click', () => moveCalendarMonth(-1));
+  $('calendarNext').addEventListener('click', () => moveCalendarMonth(1));
+  $('calendarToday').addEventListener('click', () => { setExpenseDate(fmtDate(new Date())); closeCalendar(); });
+  $('calendarDays').addEventListener('click', (event) => {
+    const day = event.target.closest('button[data-date]');
+    if (day) { setExpenseDate(day.dataset.date); closeCalendar(); }
+  });
+  $('calendarOverlay').addEventListener('click', (event) => {
+    if (event.target === $('calendarOverlay')) closeCalendar();
+  });
+  $('calendarOverlay').addEventListener('keydown', (event) => {
+    if (event.key !== 'Tab') return;
+    const buttons = [...$('calendarOverlay').querySelectorAll('button')];
+    if (event.shiftKey && document.activeElement === buttons[0]) { event.preventDefault(); buttons.at(-1).focus(); }
+    else if (!event.shiftKey && document.activeElement === buttons.at(-1)) { event.preventDefault(); buttons[0].focus(); }
+  });
   $('incSave').addEventListener('click', saveIncome);
   $('incReset').addEventListener('click', resetIncome);
   $('loadPreviousIncomeSalary').addEventListener('click', () => loadPreviousSalary('incAmount'));
-  $('saveSettings').addEventListener('click', saveSettings);
-  $('settingsReset').addEventListener('click', resetSalarySettings);
-  $('loadPreviousSettingsSalary').addEventListener('click', () => loadPreviousSalary('salaryInput'));
   $('overlay').addEventListener('click', closeSheets);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheets(); });
+  // 토글 버튼 클릭
+  $('expRecurring').addEventListener('click', () => setToggle('expRecurring', !getToggle('expRecurring')));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (!$('calendarOverlay').hidden) closeCalendar();
+      else closeSheets();
+    }
+  });
 
-  await renderAll();
-  registerSW();
+    await renderAll();
+    registerSW();
+  } catch (err) {
+    console.error('초기화 실패:', err);
+  }
 }
 
 /* ============ Service Worker ============ */
@@ -640,7 +699,7 @@ function registerSW() {
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('DOMContentLoaded', () => init().catch(console.error));
 } else {
-  init();
+  init().catch(console.error);
 }
