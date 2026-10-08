@@ -2,7 +2,9 @@
 const fs = require('fs');
 const vm = require('vm');
 
-const src = fs.readFileSync(require('path').join(__dirname, 'app.js'), 'utf8');
+// ES module import 구문 제거 (순수 로직 테스트용)
+let src = fs.readFileSync(require('path').join(__dirname, 'app.js'), 'utf8');
+src = src.replace(/^import\s.*?['"];?\s*$/gm, '');
 
 const sandbox = {
   document: {
@@ -13,9 +15,11 @@ const sandbox = {
   },
   window: { addEventListener: () => {} },
   navigator: {},
-  localStorage: { getItem: () => null, setItem: () => {} },
   confirm: () => true,
   console,
+  // IndexedDB 함수 stub (import 제거 후 전역으로 필요)
+  loadFromDB: () => Promise.resolve(null),
+  saveToDB:   () => Promise.resolve(),
 };
 sandbox.globalThis = sandbox;
 const ctx = vm.createContext(sandbox);

@@ -4,8 +4,7 @@
  */
 'use strict';
 
-/* ============ 상수 ============ */
-const STORAGE_KEY = 'paycycle_data_v2';
+import { loadFromDB, saveToDB } from './db.js';
 
 // 한국 공휴일 (필요시 연도 확장)
 const HOLIDAYS = {
@@ -153,10 +152,10 @@ function getViewCycle() {
 function cycleKey(c) { return `${c.year}-${c.index}`; }
 
 /* ============ 데이터 ============ */
-function loadState() {
+async function loadState() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) state = { ...state, ...JSON.parse(saved) };
+    const saved = await loadFromDB();
+    if (saved) state = { ...state, ...saved };
   } catch (e) { console.error('로드 실패', e); }
   // 마이그레이션: 단일 monthlySalary → 급여 이력 (전체 주기에 적용)
   if (!Array.isArray(state.salaryHistory) || state.salaryHistory.length === 0) {
@@ -165,8 +164,8 @@ function loadState() {
   if (!Array.isArray(state.recurringExpenses)) state.recurringExpenses = [];
   delete state.monthlySalary;
 }
-function saveState() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+async function saveState() {
+  try { await saveToDB(state); }
   catch (e) { console.error('저장 실패', e); }
 }
 
@@ -225,7 +224,7 @@ function recurringDatesInCycle(rule, c) {
   return dates;
 }
 
-function ensureRecurringExpenses(c) {
+async function ensureRecurringExpenses(c) {
   let changed = false;
   for (const rule of state.recurringExpenses) {
     for (const date of recurringDatesInCycle(rule, c)) {
@@ -247,7 +246,7 @@ function ensureRecurringExpenses(c) {
       }
     }
   }
-  if (changed) saveState();
+  if (changed) await saveState();
 }
 
 /* ============ 통계 ============ */
@@ -273,9 +272,9 @@ function cycleStats(c) {
 }
 
 /* ============ 렌더링 ============ */
-function renderAll() {
+async function renderAll() {
   const c = getViewCycle();
-  ensureRecurringExpenses(c);
+  await ensureRecurringExpenses(c);
   const s = cycleStats(c);
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
@@ -361,10 +360,10 @@ function renderExpenseGroup(listId, expenses, emptyMessage) {
   });
   // 체크박스 클릭 → 확인 토글 (수정 시트와 분리)
   list.querySelectorAll('[data-chk]').forEach(chk => {
-    chk.addEventListener('click', (ev) => {
+    chk.addEventListener('click', async (ev) => {
       ev.stopPropagation();
       const e = state.expenses.find(x => x.id === chk.dataset.chk);
-      if (e) { e.done = !e.done; saveState(); renderAll(); }
+      if (e) { e.done = !e.done; await saveState(); await renderAll(); }
     });
   });
 }
@@ -453,7 +452,7 @@ function readExpenseForm() {
   return { amount, name, date, category: selectedCat };
 }
 
-function saveNewExpense() {
+async function saveNewExpense() {
   const f = readExpenseForm(); if (!f) return;
   const c = locateCycle(parseDate(f.date));
   const expense = { id: uid(), ...f, cycleKey: cycleKey(c), done: false };
@@ -465,21 +464,21 @@ function saveNewExpense() {
     expense.recurrenceMonth = f.date.slice(0, 7);
   }
   state.expenses.push(expense);
-  saveState(); closeSheets(); renderAll();
+  await saveState(); closeSheets(); await renderAll();
   toast(`${f.name} ${fmtMoney(f.amount)}원 추가`);
 }
 
-function updateExpense() {
+async function updateExpense() {
   const f = readExpenseForm(); if (!f) return;
   const e = state.expenses.find(x => x.id === editingId);
   if (!e) return;
   const c = locateCycle(parseDate(f.date));
   Object.assign(e, f, { cycleKey: cycleKey(c) });
-  saveState(); closeSheets(); renderAll();
+  await saveState(); closeSheets(); await renderAll();
   toast('수정되었습니다');
 }
 
-function deleteExpense() {
+async function deleteExpense() {
   if (!editingId) return;
   const expense = state.expenses.find(x => x.id === editingId);
   if (expense?.recurrenceId) {
@@ -489,7 +488,7 @@ function deleteExpense() {
   } else {
     state.expenses = state.expenses.filter(x => x.id !== editingId);
   }
-  saveState(); closeSheets(); renderAll();
+  await saveState(); closeSheets(); await renderAll();
   toast('삭제되었습니다');
 }
 
@@ -504,7 +503,7 @@ function openIncome() {
   setTimeout(() => $('incAmount').focus(), 250);
 }
 
-function saveIncome() {
+async function saveIncome() {
   const amount = parseInt(digits($('incAmount').value), 10);
   if (!amount || amount <= 0) { $('incErr').textContent = '금액을 입력하세요'; return; }
   const c = getViewCycle();
@@ -514,16 +513,16 @@ function saveIncome() {
   } else {
     state.incomes.push({ id: uid(), type: 'salary', amount, date: fmtDate(c.payDate), cycleKey: cycleKey(c) });
   }
-  saveState(); closeSheets(); renderAll();
+  await saveState(); closeSheets(); await renderAll();
   toast(`${fmtMoney(amount)}원 급여 저장됨`);
 }
 
-function resetIncome() {
+async function resetIncome() {
   const c = getViewCycle();
   const defaultAmount = salaryFor(c);
   if (!confirm(`${fmtCycleMonth(c)} 주기 급여를 초기화할까요?\n설정된 기본 월급(${fmtMoney(defaultAmount)}원)으로 돌아갑니다.`)) return;
   state.incomes = state.incomes.filter(i => !(i.type === 'salary' && i.cycleKey === cycleKey(c)));
-  saveState(); closeSheets(); renderAll();
+  await saveState(); closeSheets(); await renderAll();
   toast('급여가 초기화되었습니다');
 }
 
@@ -536,7 +535,7 @@ function openSettings() {
   openSheet('settingsSheet');
 }
 
-function saveSettings() {
+async function saveSettings() {
   const salary = parseInt(digits($('salaryInput').value), 10);
   const activeChip = $('payDayChips').querySelector('.chip.on');
   const payDay = activeChip ? parseInt(activeChip.dataset.val, 10) : 0;
@@ -549,19 +548,19 @@ function saveSettings() {
     return;
   }
   updateSalarySettings(salary, payDay);
-  saveState(); closeSheets(); renderAll();
+  await saveState(); closeSheets(); await renderAll();
   toast(`설정 저장 (매월 ${payDay}일 지급, 다음 급여일부터 적용)`);
 }
 
-function resetSalarySettings() {
+async function resetSalarySettings() {
   if (!confirm('설정된 기본 월급을 초기화할까요?\n매달 자동 적용되는 월급이 0원으로 리셋됩니다.')) return;
   state.salaryHistory = [{ id: uid(), amount: 0, from: '0000-01-01' }];
-  saveState(); closeSheets(); renderAll();
+  await saveState(); closeSheets(); await renderAll();
   toast('기본 월급이 초기화되었습니다');
 }
 
 /* ============ 주기 초기화 ============ */
-function clearCycle() {
+async function clearCycle() {
   const c = getViewCycle();
   if (!confirm(`${fmtCycleMonth(c)} 주기(${fmtKR(c.start)} ~ ${fmtKR(c.end)})의\n지출 내역을 모두 삭제하시겠습니까?`)) return;
   const key = cycleKey(c);
@@ -574,24 +573,24 @@ function clearCycle() {
     return false;
   });
   state.incomes = state.incomes.filter(i => i.cycleKey !== key || i.type === 'salary');
-  saveState(); renderAll();
+  await saveState(); await renderAll();
   toast('주기가 초기화되었습니다');
 }
 
 /* ============ 주기 네비게이션 ============ */
-function navigate(dir) {
+async function navigate(dir) {
   const c = getViewCycle();
   let { year, index } = c;
   index += dir;
   if (index > 11) { index = 0; year += 1; }
   if (index < 0) { index = 11; year -= 1; }
   view = { year, index };
-  renderAll();
+  await renderAll();
 }
 
 /* ============ 초기화 ============ */
-function init() {
-  loadState();
+async function init() {
+  await loadState();
 
   // 기본 뷰 = 현재 주기
   const now = locateCycle(new Date());
@@ -625,7 +624,7 @@ function init() {
   $('overlay').addEventListener('click', closeSheets);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheets(); });
 
-  renderAll();
+  await renderAll();
   registerSW();
 }
 
