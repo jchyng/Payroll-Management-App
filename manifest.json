@@ -4,8 +4,8 @@
   "description": "급여일 기준 예산 주기 관리 PWA",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#0E8F73",
+  "background_color": "#F1F3F6",
+  "theme_color": "#F1F3F6",
   "orientation": "portrait-primary",
   "icons": [
     {
