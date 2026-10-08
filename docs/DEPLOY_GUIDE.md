@@ -116,8 +116,18 @@ const CACHE_VERSION = 'v2'; // 버전 올리기
 
 ### 리다이렉트/헤더 설정
 프로젝트 루트에 파일 생성:
-- `_redirects` — SPA 라우팅용: `/* /index.html 200`
-- `_headers` — 보안 헤더: `X-Frame-Options: DENY` 등
+- `_headers` — 보안 헤더, 캐시 정책, MIME 타입 등 (`_headers` 파일로 관리)
+
+> **SPA 라우팅(새로고침 시 404 방지)**은 `_redirects` 파일 대신 **대시보드 설정**으로 활성화하세요 (아래 참고).
+
+### SPA 라우팅 활성화 (필수)
+Cloudflare Pages의 **자동 HTML 확장자 제거(Pretty URLs)** 기능과 `_redirects`가 충돌해 무한 루프 발생 → 대시보드에서 설정:
+
+1. Pages 프로젝트 → **Settings** → **Build & deployments**
+2. **Single Page Application (SPA) routing** → **Enable** 체크
+3. **Save** → 다음 배포부터 적용
+
+이 설정이면 `/경로` 접근 시 자동으로 `index.html`로 폴백되어 SPA 새로고침 404 해결됨.
 
 ---
 
@@ -125,8 +135,9 @@ const CACHE_VERSION = 'v2'; // 버전 올리기
 
 | 증상 | 원인 | 해결 |
 |------|------|------|
+| **빌드 실패: Invalid _redirects** | `/* /index.html 200` 무한 루프 | `_redirects` 삭제 + 대시보드에서 **SPA routing Enable** |
 | **빌드 실패** | Build command/output dir 오타 | Settings에서 `.` 확인 |
-| **404 에러** | `index.html`이 루트에 없음 | 루트 구조 확인 |
+| **404 에러 (새로고침 시)** | SPA 라우팅 미설정 | Settings → SPA routing Enable 체크 |
 | **SW 미등록** | HTTPS 아님 / 경로 오류 | Pages는 HTTPS 자동, `sw.js` 루트 확인 |
 | **Preview URL 안 생김** | Preview deployments 비활성화 | Settings → Enable 체크 |
 
