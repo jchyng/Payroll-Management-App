@@ -3,14 +3,16 @@
  * 정적 자산 캐시 + 네트워크 우선 전략
  */
 
-const CACHE_NAME = 'paycycle-v6';
+const CACHE_NAME = 'paycycle-v7';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './style.css',
-  './app.js',
-  './db.js',
+  './css/style.css',
+  './js/app.js',
+  './js/db.js',
   './manifest.json',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
 ];
 
 // 설치 시 캐시
