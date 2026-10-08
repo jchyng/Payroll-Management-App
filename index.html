@@ -36,10 +36,36 @@
       font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;
       z-index:50;max-width:86%;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.25)}
     .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    /* 로딩 스크린 */
+    .loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;transition:opacity .4s ease,visibility .4s ease}
+    .loading-screen.hidden{opacity:0;visibility:hidden;pointer-events:none}
+    .loading-content{text-align:center;animation:fadeIn .4s ease}
+    .loading-icon{margin-bottom:20px}
+    .loading-icon svg{width:64px;height:64px}
+    .loading-text{font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-.03em;margin:0 0 6px}
+    .loading-subtext{font-size:14px;color:var(--muted);margin:0}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    @media(prefers-reduced-motion:reduce){.loading-screen{transition:none}.loading-content{animation:none}}
   </style>
 </head>
 <body>
-  <div class="app">
+  <!-- 로딩 스크린 (즉시 표시, JS에서 제거) -->
+  <div id="loadingScreen" class="loading-screen" aria-hidden="true">
+    <div class="loading-content">
+      <div class="loading-icon" aria-hidden="true">
+        <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="32" cy="32" r="28" stroke="var(--brand)" stroke-width="4" stroke-linecap="round" stroke-dasharray="175.9" stroke-dashoffset="50">
+            <animate attributeName="stroke-dashoffset" from="175.9" to="0" dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1" keyTimes="0;1"/>
+            <animate attributeName="stroke-dasharray" from="0, 175.9" to="100, 175.9" dur="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1" keyTimes="0;1"/>
+          </circle>
+        </svg>
+      </div>
+      <p class="loading-text">Payroll Management</p>
+      <p class="loading-subtext">데이터를 불러오는 중...</p>
+    </div>
+  </div>
+
+  <div class="app" id="app" style="opacity: 0; visibility: hidden;">
     <!-- 상단: 주기 네비게이션 -->
     <header class="top">
       <div class="mnav">

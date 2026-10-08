@@ -681,9 +681,27 @@ async function init() {
   });
 
     await renderAll();
+
+    // 로딩 스크린 자연스럽게 숨기기
+    const loadingScreen = document.getElementById('loadingScreen');
+    const app = document.getElementById('app');
+    if (loadingScreen && app) {
+      loadingScreen.classList.add('hidden');
+      // 앱 표시 (opacity transition)
+      requestAnimationFrame(() => {
+        app.style.opacity = '1';
+        app.style.visibility = 'visible';
+      });
+    }
+
     registerSW();
   } catch (err) {
     console.error('초기화 실패:', err);
+    // 에러 시에도 로딩 스크린 숨김
+    const loadingScreen = document.getElementById('loadingScreen');
+    const app = document.getElementById('app');
+    if (loadingScreen) loadingScreen.classList.add('hidden');
+    if (app) { app.style.opacity = '1'; app.style.visibility = 'visible'; }
   }
 }
 
