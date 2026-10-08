@@ -1,16 +1,177 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F5F6F8">
-<title>월급 플래너</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0E8F73">
+  <meta name="description" content="급여일(25일) 기준 예산 주기 가계부 PWA">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>급여 주기 가계부</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+  <style>
+    /* 디자인 시스템 추가 규칙 (기존 style.css 미수정) */
+    .sheet{display:none; z-index:31}
+    .sheet.on{display:block}
+    .ib{border:1px solid var(--line);transition:transform .12s,background .15s,color .15s,box-shadow .15s}
+    .ib:hover{background:var(--soft);color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+    .ib:active{transform:scale(.9)}
+    .ib svg{display:block}
+    select{width:100%;min-height:50px;border:0;border-radius:14px;padding:0 16px;
+      background:var(--soft);color:var(--ink);font:inherit}
+    select:focus{outline:0;box-shadow:0 0 0 2px var(--brand)}
+    .toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%) translateY(20px);
+      background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:14px;
+      font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;
+      z-index:50;max-width:86%;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  </style>
 </head>
 <body>
-<div class="app" id="app"></div>
-<div class="ov" id="ov"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
-<script src="app.js"></script>
+  <div class="app">
+    <!-- 상단: 주기 네비게이션 -->
+    <header class="top">
+      <div class="mnav">
+        <button class="ib" id="prevCycle" aria-label="이전 주기">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="mt" id="cycleTitle">1~2월 주기<small id="cycleYear">2026</small></div>
+        <button class="ib" id="nextCycle" aria-label="다음 주기">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
+      <button class="ib" id="settingsBtn" aria-label="설정">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </header>
+
+    <!-- 히어로: 잔액 -->
+    <section class="hero">
+      <div class="hl">
+        <span>남은 예산</span>
+        <button class="salary-action" id="addIncomeBtn" aria-label="급여 입력">＋ 급여 입력</button>
+      </div>
+      <div class="balance-main">
+        <div class="big" id="balanceBig">0<small>원</small></div>
+      </div>
+      <div class="bar" id="progressBar">
+        <i class="b1" id="barSpent"></i>
+        <i class="b2" id="barToday"></i>
+        <i class="d3" id="barRemain"></i>
+      </div>
+      <div class="lg">
+        <div><i class="d3"></i>남은 예산<b id="lgRemain">-</b></div>
+        <div><i class="b1"></i>지출<b id="lgSpent">-</b></div>
+        <div><i class="b2"></i>급여<b id="lgIncome">-</b></div>
+      </div>
+    </section>
+
+    <!-- 지출 내역 -->
+    <section class="sec">
+      <div class="sec-head">
+        <h2>지출 내역 <small id="expenseCount">0건</small></h2>
+        <button class="link" id="clearBtn">초기화</button>
+      </div>
+      <div class="day">
+        <span id="cycleRange">-</span>
+        <span class="due" id="ddayBadge">-</span>
+      </div>
+      <div class="expense-groups">
+        <section class="expense-group">
+          <div class="group-head"><h3>고정지출</h3><small id="recurringExpenseCount">0건</small></div>
+          <div class="list" id="recurringExpenseList">
+            <div class="empty">등록된 고정지출이 없습니다</div>
+          </div>
+        </section>
+        <section class="expense-group">
+          <div class="group-head"><h3>일반 지출</h3><small id="regularExpenseCount">0건</small></div>
+          <div class="list" id="regularExpenseList">
+            <div class="empty">등록된 지출이 없습니다</div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- FAB -->
+    <div class="fab">
+      <button class="btn" id="addExpenseBtn">＋ 지출 추가</button>
+    </div>
+  </div>
+
+  <!-- 오버레이 -->
+  <div class="ov" id="overlay"></div>
+
+  <!-- 지출 추가/수정 시트 -->
+  <div class="sheet" id="expenseSheet" role="dialog" aria-modal="true">
+    <h3 id="expSheetTitle">지출 추가</h3>
+    <label class="f"><span>금액</span>
+      <div class="amt-box">
+        <input type="text" inputmode="numeric" class="amt" id="expAmount" placeholder="0" autocomplete="off">
+        <span class="unit">원</span>
+      </div>
+    </label>
+    <label class="f"><span>항목</span>
+      <input type="text" id="expName" placeholder="예: 점심, 교통카드" autocomplete="off">
+    </label>
+    <div class="chips" id="catChips"></div>
+    <label class="f"><span>날짜</span>
+      <input type="date" id="expDate">
+    </label>
+    <label class="recurring-option">
+      <input type="checkbox" id="expRecurring">
+      <span>고정 지출 <small>월세·적금처럼 매월 반복되는 항목</small></span>
+    </label>
+    <p class="hint" id="recurringHint" hidden>고정 지출 항목은 개별 수정할 수 없으며, 삭제하면 고정 지출 설정과 등록된 항목이 모두 삭제됩니다.</p>
+    <div class="err" id="expErr"></div>
+    <button class="btn" id="expSave">추가</button>
+    <div class="foot" id="expFoot" style="display:none">
+      <button class="btn danger" id="expDelete">삭제</button>
+      <button class="btn" id="expUpdate">저장</button>
+    </div>
+  </div>
+
+  <!-- 급여 입력 시트 -->
+  <div class="sheet" id="incomeSheet" role="dialog" aria-modal="true">
+    <h3>급여 입력/수정</h3>
+    <label class="f"><span class="f-label-row"><span>금액</span><button class="label-reset" id="incReset" style="display:none">초기화</button></span>
+      <div class="amt-box">
+        <input type="text" inputmode="numeric" class="amt" id="incAmount" placeholder="3000000" autocomplete="off">
+        <span class="unit">원</span>
+      </div>
+    </label>
+    <button class="load-prev-salary" id="loadPreviousIncomeSalary">지난달 월급 불러오기</button>
+    <div class="err" id="incErr"></div>
+    <button class="btn" id="incSave">저장</button>
+  </div>
+
+  <!-- 설정 시트 -->
+  <div class="sheet" id="settingsSheet" role="dialog" aria-modal="true">
+    <h3>설정</h3>
+    <label class="f"><span class="f-label-row"><span>월급</span><button class="label-reset" id="settingsReset" style="display:none">초기화</button></span>
+      <div class="amt-box">
+        <input type="text" inputmode="numeric" class="amt" id="salaryInput" placeholder="3000000" autocomplete="off">
+        <span class="unit">원</span>
+      </div>
+    </label>
+    <button class="load-prev-salary" id="loadPreviousSettingsSalary">지난달 월급 불러오기</button>
+    <label class="f"><span>급여일 <small class="muted">(주말·공휴일이면 전 영업일)</small></span>
+      <div class="payday-chips" id="payDayChips">
+        <button type="button" class="chip" data-val="10">10일</button>
+        <button type="button" class="chip" data-val="15">15일</button>
+        <button type="button" class="chip" data-val="20">20일</button>
+        <button type="button" class="chip" data-val="25">25일</button>
+      </div>
+    </label>
+    <button class="btn" id="saveSettings">저장</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
 </body>
-</html> 
+</html>
