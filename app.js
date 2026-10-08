@@ -1,5 +1,5 @@
 /**
- * 급여 관리 (Payroll Manager)
+ * Payroll Management
  * 급여일(기본 25일, 주말·공휴일 → 전 영업일) 기준 예산 주기 계산
  */
 'use strict';
