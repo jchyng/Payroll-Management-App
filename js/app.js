@@ -42,10 +42,10 @@ let selectedCat = 'food'; // 시트에서 선택된 카테고리
 
 /* ============ 유틸 ============ */
 const $ = (id) => document.getElementById(id);
-const setToggle = (id, on) => { const el = $(id); el.classList.toggle('on', on); el.setAttribute('aria-checked', on); };
-const getToggle = (id) => $(id).classList.contains('on');
 const pad = (n) => String(n).padStart(2, '0');
 const fmtDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const monthKey = (d) => fmtDate(d).slice(0, 7);
+const monthStart = (d) => `${monthKey(d)}-01`;
 const fmtKR = (d) => `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
 const fmtMoney = (n) => Math.round(n).toLocaleString('ko-KR');
 // 주기 월 표기: 시작월~종료월 (예: 9~10월, 12~1월)
@@ -94,12 +94,15 @@ function toast(msg) {
 }
 
 /* ============ 급여일 / 주기 계산 ============ */
+function isNonBusinessDay(d) {
+  return d.getDay() === 0 || d.getDay() === 6 || (HOLIDAYS[d.getFullYear()] || []).includes(fmtDate(d));
+}
+
 function getPayDate(year, month, payDay = state.payDay) {
   const lastDay = new Date(year, month, 0).getDate();
   let d = new Date(year, month - 1, Math.min(payDay, lastDay));
-  const hol = new Set([...(HOLIDAYS[year] || []), ...(HOLIDAYS[year + 1] || [])]);
   let guard = 0;
-  while ((d.getDay() === 0 || d.getDay() === 6 || hol.has(fmtDate(d))) && guard < 10) {
+  while (isNonBusinessDay(d) && guard < 10) {
     d.setDate(d.getDate() - 1);
     guard++;
   }
@@ -213,39 +216,98 @@ function updateSalarySettings(amount, payDay, today = new Date()) {
 function recurringDatesInCycle(rule, c) {
   const dates = [];
   const month = new Date(c.start.getFullYear(), c.start.getMonth(), 1);
+  // 지난달 말일이 주말이면 이 급여 주기의 첫날 이후로 밀릴 수 있다.
+  month.setMonth(month.getMonth() - 1);
   const lastMonth = new Date(c.end.getFullYear(), c.end.getMonth(), 1);
   while (month <= lastMonth) {
-    const year = month.getFullYear();
-    const monthNumber = month.getMonth() + 1;
-    const day = Math.min(rule.day, new Date(year, monthNumber, 0).getDate());
-    const date = new Date(year, monthNumber - 1, day);
+    const recurrenceMonth = monthKey(month);
+    const planned = recurringPlannedDate(rule, month);
+    const date = recurringDateInMonth(rule, month);
     const dateString = fmtDate(date);
-    if (date >= c.start && date <= c.end && dateString >= rule.startDate) dates.push(dateString);
+    if (date >= c.start && date <= c.end && fmtDate(planned) >= rule.startDate) {
+      dates.push({ date: dateString, recurrenceMonth });
+    }
     month.setMonth(month.getMonth() + 1);
   }
   return dates;
 }
 
+function recurringPlannedDate(rule, month) {
+  const lastDay = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  return new Date(month.getFullYear(), month.getMonth(), Math.min(rule.day, lastDay));
+}
+
+function recurringDateInMonth(rule, now) {
+  const date = recurringPlannedDate(rule, now);
+  // 해당 월에 지정일이 없으면 말일에 적용하고 다음 달로 넘기지 않는다.
+  if (date.getDate() !== rule.day) return date;
+  let guard = 0;
+  while (isNonBusinessDay(date) && guard < 10) {
+    date.setDate(date.getDate() + 1);
+    guard++;
+  }
+  return date;
+}
+
+function addRecurringOccurrence(rule, date, c, recurrenceMonth) {
+  const exists = state.expenses.some(e => e.recurrenceId === rule.id && e.recurrenceMonth === recurrenceMonth);
+  if (exists) return false;
+  state.expenses.push({
+    id: uid(), name: rule.name, amount: rule.amount, date, category: rule.category,
+    cycleKey: cycleKey(c), recurrenceId: rule.id, recurrenceMonth,
+  });
+  return true;
+}
+
+// 열어보지 않은 과거 급여 주기도 종료/수정 전에 기록으로 확정한다.
+function materializeRecurringHistory(rule, now) {
+  const month = parseDate(rule.startDate);
+  month.setDate(1);
+  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  while (month < currentMonth) {
+    const date = recurringDateInMonth(rule, month);
+    const dateString = fmtDate(date);
+    if (fmtDate(recurringPlannedDate(rule, month)) >= rule.startDate) {
+      addRecurringOccurrence(rule, dateString, locateCycle(date), monthKey(month));
+    }
+    month.setMonth(month.getMonth() + 1);
+  }
+}
+
+// 이번 달 이후 일정과 지난달 말에서 이번 달로 이월된 일정을 새 규칙으로 맞춘다.
+function rescheduleRecurringOccurrences(now) {
+  const fromMonth = monthKey(now);
+  let changed = false;
+  for (const e of state.expenses) {
+    if (!e.recurrenceId || e.deleted) continue;
+    const rule = state.recurringExpenses.find(r => r.id === e.recurrenceId);
+    if (!rule) continue;
+    const recurrenceMonth = e.recurrenceMonth || e.date.slice(0, 7);
+    const [year, month] = recurrenceMonth.split('-').map(Number);
+    const date = recurringDateInMonth(rule, new Date(year, month - 1, 1));
+    if (recurrenceMonth < fromMonth && monthKey(date) < fromMonth) continue;
+    const dateString = fmtDate(date);
+    const key = cycleKey(locateCycle(date));
+    if (e.date !== dateString || e.cycleKey !== key || e.recurrenceMonth !== recurrenceMonth) {
+      Object.assign(e, { date: dateString, cycleKey: key, recurrenceMonth });
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+// 반복 설정을 종료하거나 바꿀 때 지난달까지의 실제 내역은 그대로 남긴다.
+function removeRecurringOccurrencesFromMonth(ruleId, fromMonth) {
+  state.expenses = state.expenses.filter(e =>
+    e.recurrenceId !== ruleId || (e.recurrenceMonth || e.date.slice(0, 7)) < fromMonth
+  );
+}
+
 async function ensureRecurringExpenses(c) {
   let changed = false;
   for (const rule of state.recurringExpenses) {
-    for (const date of recurringDatesInCycle(rule, c)) {
-      const recurrenceMonth = date.slice(0, 7);
-      const exists = state.expenses.some(e => e.recurrenceId === rule.id && e.recurrenceMonth === recurrenceMonth);
-      if (!exists) {
-        state.expenses.push({
-          id: uid(),
-          name: rule.name,
-          amount: rule.amount,
-          date,
-          category: rule.category,
-          cycleKey: cycleKey(c),
-          done: false,
-          recurrenceId: rule.id,
-          recurrenceMonth,
-        });
-        changed = true;
-      }
+    for (const { date, recurrenceMonth } of recurringDatesInCycle(rule, c)) {
+      if (addRecurringOccurrence(rule, date, c, recurrenceMonth)) changed = true;
     }
   }
   if (changed) await saveState();
@@ -342,32 +404,37 @@ function renderExpenseGroup(listId, expenses, emptyMessage) {
   }
 
   const sorted = [...expenses].sort((a, b) => b.date.localeCompare(a.date));
+  const today = new Date();
   list.innerHTML = sorted.map(e => {
     const cat = catOf(e.category);
+    const daysLeft = e.recurrenceId ? expenseDaysLeft(e.date, today) : -1;
+    const ddayText = daysLeft === 0 ? 'D-DAY' : `D-${daysLeft}`;
     return `
-      <div class="row ${e.done ? 'done' : ''}" data-id="${e.id}">
-        <div class="ic">${cat.emoji}</div>
-        <div class="main">
-          <div class="t">${escapeHtml(e.name)}</div>
-          <div class="s">${e.date} · ${cat.label} · ${e.done ? '완료' : '예정'}</div>
-        </div>
-        <div class="a">-${fmtMoney(e.amount)}원</div>
-        <div class="chk" data-chk="${e.id}">${e.done ? '✓' : ''}</div>
-      </div>`;
+      <button type="button" class="row" data-id="${escapeHtml(e.id)}" aria-label="${escapeHtml(e.name)}, ${fmtMoney(e.amount)}원, ${escapeHtml(e.date)}, ${cat.label}${daysLeft >= 0 ? `, ${ddayText}` : ''}, 수정">
+        <span class="ic" aria-hidden="true">${cat.emoji}</span>
+        <span class="main">
+          <span class="row-top">
+            <span class="t">${escapeHtml(e.name)}</span>
+            <span class="a">-${fmtMoney(e.amount)}원</span>
+          </span>
+          <span class="row-bottom">
+            <span class="s">${escapeHtml(e.date)} · ${cat.label}</span>
+            ${daysLeft >= 0 ? `<span class="expense-dday ${daysLeft === 0 ? 'is-today' : ''}">${ddayText}</span>` : ''}
+          </span>
+        </span>
+      </button>`;
   }).join('');
 
   // 행 클릭 → 수정 시트
   list.querySelectorAll('.row').forEach(row => {
     row.addEventListener('click', () => openEditExpense(row.dataset.id));
   });
-  // 체크박스 클릭 → 확인 토글 (수정 시트와 분리)
-  list.querySelectorAll('[data-chk]').forEach(chk => {
-    chk.addEventListener('click', async (ev) => {
-      ev.stopPropagation();
-      const e = state.expenses.find(x => x.id === chk.dataset.chk);
-      if (e) { e.done = !e.done; await saveState(); await renderAll(); }
-    });
-  });
+}
+
+function expenseDaysLeft(date, today = new Date()) {
+  const due = parseDate(date);
+  const utcDay = d => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  return Math.round((utcDay(due) - utcDay(today)) / 864e5);
 }
 
 /* ============ 시트 공통 ============ */
@@ -418,6 +485,17 @@ function buildCatChips() {
 
 /* ============ 지출 날짜 선택 ============ */
 let calendarView = null;
+function syncExpenseDateUI() {
+  const recurring = $('expRecurring').checked;
+  $('dateLabel').textContent = recurring ? '매월 지출일' : '날짜';
+  $('expDateTrigger').hidden = recurring;
+  $('expRecurringDay').hidden = !recurring;
+  $('expRecurringHint').hidden = !recurring;
+  $('expRecurringHint').textContent = editingId
+    ? '변경·삭제는 이번 달부터 적용 · 지난달 기록은 유지'
+    : '없는 날짜는 말일 · 주말·공휴일은 다음 영업일';
+}
+
 function setExpenseDate(value) {
   $('expDate').value = value;
   const date = parseDate(value);
@@ -473,8 +551,11 @@ function openAddExpense() {
   $('expAmount').value = '';
   $('expName').value = '';
   setExpenseDate(fmtDate(new Date()));
-  setToggle('expRecurring', false);
+  $('expRecurring').checked = false;
   $('expRecurring').disabled = false;
+  $('expRecurringDay').disabled = false;
+  $('expRecurringDay').value = String(new Date().getDate());
+  syncExpenseDateUI();
   $('expErr').textContent = '';
   selectedCat = 'food';
   buildCatChips();
@@ -484,18 +565,23 @@ function openAddExpense() {
 function openEditExpense(id) {
   const e = state.expenses.find(x => x.id === id);
   if (!e) return;
+  const rule = state.recurringExpenses.find(x => x.id === e.recurrenceId);
+  const item = rule || e;
   editingId = id;
-  $('expSheetTitle').textContent = '지출 수정';
+  $('expSheetTitle').textContent = e.recurrenceId ? '고정 지출 수정' : '지출 수정';
   $('expSave').style.display = 'none';
   $('expFoot').style.display = '';
-  $('expAmount').value = formatAmountInput(e.amount);
-  $('expName').value = e.name;
+  $('expAmount').value = formatAmountInput(item.amount);
+  $('expName').value = item.name;
   setExpenseDate(e.date);
-  const isRecurring = !!e.recurrenceId;
-  setToggle('expRecurring', isRecurring);
-  $('expRecurring').disabled = isRecurring;
+  $('expRecurring').checked = !!e.recurrenceId;
+  $('expRecurring').disabled = true;
+  $('expRecurringDay').value = String(rule?.day || parseDate(e.date).getDate());
+  $('expRecurringDay').disabled = !!e.recurrenceId && !rule;
+  syncExpenseDateUI();
+  if (e.recurrenceId && !rule) $('expRecurringHint').textContent = '종료된 고정 지출 · 이 내역만 수정·삭제';
   $('expErr').textContent = '';
-  selectedCat = e.category;
+  selectedCat = item.category;
   buildCatChips();
   openSheet('expenseSheet');
 }
@@ -503,24 +589,30 @@ function openEditExpense(id) {
 function readExpenseForm() {
   const amount = parseInt(digits($('expAmount').value), 10);
   const name = $('expName').value.trim() || catOf(selectedCat).label;
-  const date = $('expDate').value;
   if (!amount || amount <= 0) { $('expErr').textContent = '금액을 입력하세요'; return null; }
+  if ($('expRecurring').checked) {
+    const day = Number($('expRecurringDay').value);
+    if (!Number.isInteger(day) || day < 1 || day > 31) {
+      $('expErr').textContent = '매월 지출일을 선택하세요'; return null;
+    }
+    return { amount, name, category: selectedCat, day };
+  }
+  const date = $('expDate').value;
   if (!date) { $('expErr').textContent = '날짜를 선택하세요'; return null; }
   return { amount, name, date, category: selectedCat };
 }
 
 async function saveNewExpense() {
   const f = readExpenseForm(); if (!f) return;
-  const c = locateCycle(parseDate(f.date));
-  const expense = { id: uid(), ...f, cycleKey: cycleKey(c), done: false };
-  if (getToggle('expRecurring')) {
-    const recurrenceId = uid();
-    const day = parseDate(f.date).getDate();
-    state.recurringExpenses.push({ id: recurrenceId, ...f, day, startDate: f.date });
-    expense.recurrenceId = recurrenceId;
-    expense.recurrenceMonth = f.date.slice(0, 7);
+  if ($('expRecurring').checked) {
+    const now = new Date();
+    const rule = { id: uid(), ...f, startDate: monthStart(now) };
+    state.recurringExpenses.push(rule);
+    await ensureRecurringExpenses(locateCycle(recurringDateInMonth(rule, now)));
+  } else {
+    const c = locateCycle(parseDate(f.date));
+    state.expenses.push({ id: uid(), ...f, cycleKey: cycleKey(c) });
   }
-  state.expenses.push(expense);
   await saveState(); closeSheets(); await renderAll();
   toast(`${f.name} ${fmtMoney(f.amount)}원 추가`);
 }
@@ -529,8 +621,23 @@ async function updateExpense() {
   const f = readExpenseForm(); if (!f) return;
   const e = state.expenses.find(x => x.id === editingId);
   if (!e) return;
-  const c = locateCycle(parseDate(f.date));
-  Object.assign(e, f, { cycleKey: cycleKey(c) });
+  const rule = state.recurringExpenses.find(x => x.id === e.recurrenceId);
+  if (rule) {
+    const now = new Date();
+    const fromMonth = monthKey(now);
+    materializeRecurringHistory(rule, now);
+    // 지워진 주기(초기화한 주기)의 표시 억제 기록은 유지한다.
+    state.expenses = state.expenses.filter(item =>
+      item.recurrenceId !== rule.id || (item.recurrenceMonth || item.date.slice(0, 7)) < fromMonth || item.deleted
+    );
+    Object.assign(rule, f);
+    await ensureRecurringExpenses(locateCycle(recurringDateInMonth(rule, now)));
+  } else if (e.recurrenceId) {
+    Object.assign(e, { name: f.name, amount: f.amount, category: f.category });
+  } else {
+    const c = locateCycle(parseDate(f.date));
+    Object.assign(e, f, { cycleKey: cycleKey(c) });
+  }
   await saveState(); closeSheets(); await renderAll();
   toast('수정되었습니다');
 }
@@ -538,15 +645,21 @@ async function updateExpense() {
 async function deleteExpense() {
   if (!editingId) return;
   const expense = state.expenses.find(x => x.id === editingId);
-  if (expense?.recurrenceId) {
-    if (!confirm('이 고정 지출 설정과 등록된 항목을 모두 삭제할까요?')) return;
-    state.recurringExpenses = state.recurringExpenses.filter(rule => rule.id !== expense.recurrenceId);
-    state.expenses = state.expenses.filter(item => item.recurrenceId !== expense.recurrenceId);
+  if (!expense) return;
+  const rule = state.recurringExpenses.find(x => x.id === expense?.recurrenceId);
+  const stoppedRecurring = !!rule;
+  if (rule) {
+    if (!confirm('이 고정 지출을 이번 달부터 중단할까요? 지난달까지의 기록은 남습니다.')) return;
+    const now = new Date();
+    materializeRecurringHistory(rule, now);
+    state.recurringExpenses = state.recurringExpenses.filter(item => item.id !== rule.id);
+    removeRecurringOccurrencesFromMonth(rule.id, monthKey(now));
   } else {
+    if (expense?.recurrenceId && !confirm('지난 고정 지출 내역을 삭제할까요?')) return;
     state.expenses = state.expenses.filter(x => x.id !== editingId);
   }
   await saveState(); closeSheets(); await renderAll();
-  toast('삭제되었습니다');
+  toast(stoppedRecurring ? '이번 달부터 고정 지출이 중단되었습니다' : '삭제되었습니다');
 }
 
 /* ============ 급여 입력 ============ */
@@ -627,6 +740,7 @@ async function navigate(dir) {
 async function init() {
   try {
     await loadState();
+    if (rescheduleRecurringOccurrences(new Date())) await saveState();
 
     // 기본 뷰 = 현재 주기
     const now = locateCycle(new Date());
@@ -635,6 +749,9 @@ async function init() {
   // 칩 생성
   buildCatChips();
   buildPayDayChips();
+  $('expRecurringDay').innerHTML = Array.from({ length: 31 }, (_, i) =>
+    `<option value="${i + 1}">${i + 1}일</option>`
+  ).join('');
 
   // 금액 입력: 숫자만
   ['expAmount', 'incAmount'].forEach(id => {
@@ -673,8 +790,7 @@ async function init() {
   $('incReset').addEventListener('click', resetIncome);
   $('loadPreviousIncomeSalary').addEventListener('click', () => loadPreviousSalary('incAmount'));
   $('overlay').addEventListener('click', closeSheets);
-  // 토글 버튼 클릭
-  $('expRecurring').addEventListener('click', () => setToggle('expRecurring', !getToggle('expRecurring')));
+  $('expRecurring').addEventListener('change', syncExpenseDateUI);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (!$('calendarOverlay').hidden) closeCalendar();

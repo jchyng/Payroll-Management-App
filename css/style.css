@@ -44,14 +44,15 @@ h2 small{font-size:13px;font-weight:600;color:var(--muted);margin-left:8px}
 .list{background:var(--card);border-radius:20px;overflow:hidden}
 .row{display:flex;align-items:center;gap:12px;width:100%;padding:12px 16px;text-align:left;min-height:64px}
 .row+.row{border-top:1px solid var(--line)}
-.main{flex:1;min-width:0;text-align:left}
-.t{font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.s{font-size:13px;color:var(--muted)}
-.a{font-weight:700;font-variant-numeric:tabular-nums}
+.main{display:block;flex:1;min-width:0;text-align:left}
+.row-top{display:flex;align-items:baseline;gap:8px;min-width:0}
+.row-bottom{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:4px}
+.t{flex:1;min-width:0;font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.s{font-size:13px;color:var(--muted);white-space:nowrap}
+.expense-dday{display:inline-flex;padding:0 8px;color:var(--brand);font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.6;white-space:nowrap}
+.expense-dday.is-today{padding:0 8px;background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red);border-radius:7px}
+.a{flex-shrink:0;font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
 .ic{width:42px;height:42px;border-radius:14px;background:var(--soft);display:grid;place-items:center;font-size:20px;flex-shrink:0}
-.chk{width:30px;height:30px;border-radius:50%;border:2px solid #C5CCD6;display:grid;place-items:center;flex-shrink:0;color:var(--on);transition:background .15s,border-color .15s}
-.done .chk{background:var(--brand);border-color:var(--brand)}
-.done .t,.done .a{color:var(--muted);text-decoration:line-through}
 .due{margin-left:6px;font-weight:700;color:var(--brand)}.due.late{color:var(--red)}
 .day{display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--muted);margin:18px 6px 8px}
 .empty{color:var(--muted);text-align:center;padding:28px 16px;font-size:14px}
@@ -88,21 +89,12 @@ input.amt{font-size:30px;font-weight:800;min-height:68px;font-variant-numeric:ta
 .load-prev-salary{display:block;margin:-10px 0 14px auto;padding:0;color:var(--brand);font-size:13px;font-weight:700}
 .f-label-row{display:flex !important;align-items:center;justify-content:space-between;width:100%}
 .label-reset{padding:0;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;font-weight:600}
-.recurring-option{display:flex;align-items:center;justify-content:space-between;margin:4px 0 14px;font-weight:700}
-.toggle{position:relative;width:48px;height:28px;border-radius:14px;background:var(--line);border:none;transition:background .2s}
-.toggle:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
-.toggle.on{background:var(--brand)}
-.toggle .toggle-thumb{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--card);box-shadow:0 2px 6px rgba(0,0,0,.15);transition:transform .2s}
-.toggle.on .toggle-thumb{transform:translateX(20px)}
 .err{color:var(--red);font-size:13px;font-weight:600;min-height:20px;margin-bottom:4px}
 .irow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
 .irow input{font-size:16px}
 .irow .f{margin-bottom:0}
-.irow .recurring-option{margin:0}
 .irow label.f{display:flex;flex-direction:column;gap:6px}
 .irow label.f > span{margin-bottom:0}
-.ck{display:flex;align-items:center;gap:10px;margin:2px 0 14px;font-size:15px}
-.ck input{width:22px;height:22px;accent-color:var(--brand)}
 
 /* 지출 입력: 중요한 정보부터 읽히고 작은 화면에서도 저장 버튼이 보이도록 */
 #expenseSheet{padding:10px 22px calc(14px + env(safe-area-inset-bottom));overscroll-behavior:contain}
@@ -120,14 +112,18 @@ input.amt{font-size:30px;font-weight:800;min-height:68px;font-variant-numeric:ta
 #expenseSheet .chips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0}
 #expenseSheet .chip{min-width:0;min-height:38px;padding:0 4px;border:1px solid var(--line);border-radius:12px;background:var(--soft);font-size:13px;white-space:nowrap}
 #expenseSheet .chip.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 12%,var(--card));color:var(--brand);font-weight:800}
-.expense-options{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(104px,1fr);gap:10px;margin-bottom:8px}
+.expense-options{display:grid;grid-template-columns:minmax(105px,.8fr) minmax(0,1.6fr);gap:10px;align-items:end;margin-bottom:8px}
+.expense-options .date-option{min-width:0}
 .date-trigger{display:flex;align-items:center;justify-content:space-between;gap:4px;width:100%;min-height:46px;padding:0 12px;border:1px solid var(--line);border-radius:13px;background:var(--soft);font-size:14px;font-weight:700;text-align:left;white-space:nowrap}
+.date-trigger span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .date-trigger svg{flex-shrink:0;color:var(--brand)}
-#expenseSheet .recurring-option{display:flex;flex-direction:column;align-items:stretch;justify-content:initial;gap:5px;margin:0}
-#expenseSheet .recurring-option .field-label{margin:0}
-#expenseSheet .recurring-option .toggle{align-self:center;width:52px;height:30px;margin-top:8px;flex-shrink:0}
-#expenseSheet .recurring-option .toggle .toggle-thumb{width:24px;height:24px}
-#expenseSheet .recurring-option .toggle.on .toggle-thumb{transform:translateX(22px)}
+.recurring-option{display:flex;align-items:center;gap:8px;min-height:46px;font-size:14px;font-weight:700;white-space:nowrap;cursor:pointer}
+.recurring-option input{width:20px;height:20px;margin:0;accent-color:var(--brand);cursor:pointer}
+.recurring-option:has(input:disabled){cursor:default}
+.recurring-option input:disabled{cursor:default}
+#expRecurringDay{min-height:46px;border:1px solid var(--line);border-radius:13px;background:var(--soft);font-size:14px;font-weight:700}
+#expRecurringDay[hidden],#expDateTrigger[hidden]{display:none}
+.recurring-hint{margin:0 0 8px;color:var(--muted);font-size:12px}
 .expense-actions{position:sticky;bottom:0;z-index:1;padding-top:8px;background:var(--card)}
 #expenseSheet .err{min-height:0;margin:0;font-size:13px}
 #expenseSheet .err:not(:empty){margin-bottom:6px}
@@ -150,7 +146,8 @@ input.amt{font-size:30px;font-weight:800;min-height:68px;font-variant-numeric:ta
 .calendar-days button.is-today{box-shadow:inset 0 0 0 1px var(--brand);color:var(--brand)}
 .calendar-days button.is-selected{background:var(--brand);color:var(--on);box-shadow:none}
 .calendar-today{width:100%;min-height:42px;margin-top:14px;border:1px solid var(--line);border-radius:12px;color:var(--brand);font-weight:700}
-@media(max-width:355px){#expenseSheet{padding-left:16px;padding-right:16px}#expenseSheet .chip{font-size:12px}.expense-options{grid-template-columns:minmax(0,1fr) 104px;gap:6px}.date-trigger{padding:0 8px;font-size:12px}}
+@media(max-width:355px){#expenseSheet{padding-left:16px;padding-right:16px}#expenseSheet .chip{font-size:12px}.expense-options{grid-template-columns:105px minmax(0,1fr);gap:6px}.date-trigger{padding:0 8px;font-size:12px}}
+@media(max-width:355px){.row-top{flex-wrap:wrap}.row-top .t{flex-basis:100%}}
 @media(max-height:700px){#expenseSheet{padding-top:8px;padding-bottom:calc(10px + env(safe-area-inset-bottom))}#expenseSheet .expense-heading{margin-bottom:7px}#expenseSheet .f{margin-bottom:8px}.category-field{margin-bottom:8px}#expenseSheet .chip{min-height:34px}.expense-options{margin-bottom:4px}}
 
 .payday-chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 10px}
