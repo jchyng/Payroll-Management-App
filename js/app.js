@@ -363,18 +363,16 @@ async function renderAll() {
   big.innerHTML = `${fmtMoney(Math.abs(s.balance))}<small>원</small>`;
   big.classList.toggle('neg', s.balance < 0);
 
-  // 진행바: 지출(회색) + 시간경과(앰버) + 잔여(초록)
+  // 진행바: 지출(회색) + 남은예산(초록) — 급여를 100% 기준으로
   const bar = $('progressBar');
   bar.classList.toggle('neg', s.balance < 0);
-  $('barSpent').style.width = `${s.progress}%`;
-  const amber = Math.max(0, Math.min(100 - s.progress, s.timePct - s.progress));
-  $('barToday').style.width = `${amber}%`;
-  $('barRemain').style.width = `${Math.max(0, 100 - s.progress - amber)}%`;
+  const spentPct = Math.min(100, s.progress); // 지출 비율 (급여 대비)
+  $('barSpent').style.width = `${spentPct}%`;
+  $('barRemain').style.width = `${Math.max(0, 100 - spentPct)}%`;
 
   // 범례
   $('lgRemain').textContent = fmtWan(s.balance);
   $('lgSpent').textContent = fmtWan(s.totalExpense);
-  $('lgIncome').textContent = fmtWan(s.totalIncome);
 
   const salaryButton = $('addIncomeBtn');
   const hasSalary = salaryForCycle(c) > 0;
