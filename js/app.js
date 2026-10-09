@@ -30,6 +30,7 @@ const CATEGORIES = [
   { id: 'medical',       label: '의료/보험', emoji: '💊' },
   { id: 'savings',       label: '저축',     emoji: '🐷' },
   { id: 'date',          label: '데이트',   emoji: '💑' },
+  { id: 'installment',   label: '할부',     emoji: '💳' },
   { id: 'etc',           label: '기타',     emoji: '✨' },
 ];
 const catOf = (id) => CATEGORIES.find(c => c.id === id) || CATEGORIES[CATEGORIES.length - 1];
