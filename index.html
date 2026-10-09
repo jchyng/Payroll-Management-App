@@ -213,14 +213,14 @@
       </div>
     </label>
     <button class="load-prev-salary" id="loadPreviousIncomeSalary">지난달 월급 불러오기</button>
-    <label class="f"><span>급여일 <small class="muted">(주말·공휴일이면 전 영업일)</small></span>
-      <div class="payday-chips" id="payDayChips">
-        <button type="button" class="chip" data-val="10">10일</button>
-        <button type="button" class="chip" data-val="15">15일</button>
-        <button type="button" class="chip" data-val="20">20일</button>
-        <button type="button" class="chip" data-val="25">25일</button>
+    <div class="f"><span class="field-label">급여일 <small class="muted">(주말·공휴일이면 전 영업일)</small></span>
+      <div class="payday-chips" id="payDayChips" role="radiogroup" aria-label="급여일 선택">
+        <button type="button" class="chip" data-val="10" role="radio" aria-checked="false">10일</button>
+        <button type="button" class="chip" data-val="15" role="radio" aria-checked="false">15일</button>
+        <button type="button" class="chip" data-val="20" role="radio" aria-checked="false">20일</button>
+        <button type="button" class="chip" data-val="25" role="radio" aria-checked="false">25일</button>
       </div>
-    </label>
+    </div>
     <div class="err" id="incErr"></div>
     <button class="btn" id="incSave">저장</button>
   </div>

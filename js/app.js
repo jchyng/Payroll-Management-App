@@ -393,7 +393,9 @@ function buildPayDayChips() {
 
 function syncPayDayUI(day) {
   $('payDayChips').querySelectorAll('.chip').forEach(chip => {
-    chip.classList.toggle('on', parseInt(chip.dataset.val, 10) === day);
+    const isActive = parseInt(chip.dataset.val, 10) === day;
+    chip.classList.toggle('on', isActive);
+    chip.setAttribute('aria-checked', isActive);
   });
 }
 
