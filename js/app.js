@@ -5,6 +5,7 @@
 'use strict';
 
 import { loadFromDB, saveToDB } from './db.js';
+import { runMigrations } from './migration.js';
 
 // 한국 공휴일 (필요시 연도 확장)
 const HOLIDAYS = {
@@ -738,6 +739,9 @@ async function navigate(dir) {
 /* ============ 초기화 ============ */
 async function init() {
   try {
+    // 데이터 마이그레이션 실행 (가장 먼저)
+    await runMigrations();
+
     await loadState();
     if (rescheduleRecurringOccurrences(new Date())) await saveState();
 

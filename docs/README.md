@@ -140,6 +140,57 @@ node test.js
 
 급여일 계산, 주기 생성, 날짜→주기 매핑, 통계 및 고정지출 반복·중단을 검증합니다.
 
+## 데이터 마이그레이션 시스템
+
+앱 업데이트 시 데이터 구조가 변경되어도 기존 사용자의 데이터를 자동으로 변환해 줍니다.
+
+### 동작 방식
+
+1. **쿠키 기반 버전 관리**: `paycycle_last_migration` 쿠키에 마지막 마이그레이션 실행 날짜(YYYY-MM-DD)를 저장합니다.
+2. **초기화 시 자동 실행**: 앱 로드 시 `runMigrations()`가 호출되어, 저장된 날짜보다 최신인 마이그레이션만 순차 실행합니다.
+3. **단일 진입점**: `js/migration.js`의 `MIGRATIONS` 배열에만 새 마이그레이션을 추가하면 됩니다.
+
+### 마이그레이션 추가 규칙
+
+`js/migration.js`의 `MIGRATIONS` 배열에 다음 형식으로 추가하세요:
+
+```js
+{
+  date: '2026-10-11',  // 작성 날짜 (ISO 8601)
+  fn: async (state) => {
+    // state를 변환하여 반환
+    // 예: state.newField = state.oldField; delete state.oldField;
+    return state;
+  }
+}
+```
+
+**규칙:**
+- 배열은 **날짜순(오래된 것부터)**으로 정렬되어 있어야 합니다.
+- 마이그레이션 함수는 **멱등성(idempotent)**을 가져야 합니다(중복 실행되어도 안전).
+- `saveToDB`를 직접 호출하지 마세요. `runMigrations`가 마지막에 한 번 저장합니다.
+- 기존 데이터와의 호환성을 고려해 방어적으로 작성하세요(`optional chaining`, 기본값 등).
+
+### 개발/디버깅 도구
+
+브라우저 콘솔에서 사용 가능:
+
+```js
+// 마이그레이션 쿠키 확인
+import { getMigrationCookie } from './js/migration.js';
+getMigrationCookie();
+
+// 쿠키 강제 초기화 (마이그레이션 재실행용)
+import { resetMigrationCookie } from './js/migration.js';
+resetMigrationCookie();
+```
+
+### 기존 마이그레이션 내역
+
+| 날짜 | 내용 |
+|------|------|
+| 2025-01-15 | `monthlySalary` 단일값 → `salaryHistory` 배열로 변환 (초기 구현 시 적용됨) |
+
 ## 라이선스
 
 MIT
