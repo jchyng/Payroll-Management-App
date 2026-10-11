@@ -2,7 +2,7 @@
   "name": "Payroll Management",
   "short_name": "Payroll M",
   "description": "급여일 기준 예산 주기 관리 PWA",
-  "start_url": "./index.html",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#F1F3F6",
   "theme_color": "#F1F3F6",

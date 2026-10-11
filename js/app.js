@@ -814,8 +814,6 @@ async function init() {
         app.style.visibility = 'visible';
       });
     }
-
-    registerSW();
   } catch (err) {
     console.error('초기화 실패:', err);
     // 에러 시에도 로딩 스크린 숨김
@@ -829,12 +827,19 @@ async function init() {
 /* ============ Service Worker ============ */
 function registerSW() {
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js')
-        .then(reg => console.log('SW 등록:', reg.scope))
-        .catch(err => console.log('SW 등록 실패:', err));
-    });
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('SW 등록:', reg.scope))
+      .catch(err => console.log('SW 등록 실패:', err));
   }
+}
+
+// SW 조기 등록 (DOMContentLoaded 즉시)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('DOMContentLoaded', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('SW 조기 등록:', reg.scope))
+      .catch(err => console.log('SW 조기 등록 실패:', err));
+  });
 }
 
 if (document.readyState === 'loading') {

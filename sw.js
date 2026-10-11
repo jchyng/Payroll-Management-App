@@ -5,14 +5,14 @@
 
 const CACHE_NAME = 'paycycle-v9';
 const STATIC_ASSETS = [
-  './',
-  './index.html',
-  './css/style.css',
-  './js/app.js',
-  './js/db.js',
-  './manifest.json',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
+  '/',
+  '/index.html',
+  '/css/style.css',
+  '/js/app.js',
+  '/js/db.js',
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
 ];
 
 // 설치 시 캐시
@@ -40,6 +40,10 @@ self.addEventListener('fetch', (event) => {
   // GET 요청만 처리
   if (event.request.method !== 'GET') return;
 
+  const requestUrl = new URL(event.request.url);
+  const isNavigation = event.request.mode === 'navigate' || 
+    (event.request.headers.get('accept')?.includes('text/html') && event.request.destination === 'document');
+
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true })
       .then((cached) => {
@@ -63,7 +67,13 @@ self.addEventListener('fetch', (event) => {
         // 캐시 없으면 네트워크
         return fetch(event.request)
           .then((response) => {
-            if (!response.ok) return response;
+            if (!response.ok) {
+              // 네비게이션 요청 실패 시 오프라인 폴백
+              if (isNavigation) {
+                return caches.match('/index.html');
+              }
+              return response;
+            }
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, clone);
@@ -71,9 +81,9 @@ self.addEventListener('fetch', (event) => {
             return response;
           })
           .catch(() => {
-            // 오프라인이고 HTML 요청이면 기본 페이지 반환
-            if (event.request.headers.get('accept')?.includes('text/html')) {
-              return caches.match('./index.html');
+            // 오프라인이고 네비게이션/HTML 요청이면 기본 페이지 반환
+            if (isNavigation) {
+              return caches.match('/index.html');
             }
           });
       })
