@@ -65,11 +65,11 @@ function todayISO() {
  * @type {Array<{date: string, fn: (state: any) => Promise<any>}>}
  */
 const MIGRATIONS = [
-  // 예시 마이그레이션 (실제로는 아래 실제 마이그레이션들이 있습니다)
+  // 2025-01-15: monthlySalary 단일값 → salaryHistory 배열로 변환 (초기 구현 시 적용됨)
+  // 이미 실행된 마이그레이션은 주석으로 보관
   // {
   //   date: '2025-01-15',
   //   fn: async (state) => {
-  //     // state.monthlySalary → state.salaryHistory 변환
   //     if (state.monthlySalary && (!state.salaryHistory || state.salaryHistory.length === 0)) {
   //       state.salaryHistory = [{ id: 'migrated', amount: state.monthlySalary, from: '0000-01-01' }];
   //       delete state.monthlySalary;
@@ -77,6 +77,31 @@ const MIGRATIONS = [
   //     return state;
   //   }
   // },
+
+  // 2026-11-15: recurringExpenses → repeatExpenses 키 이름 변경 + durationMonths 필드 지원
+  {
+    date: '2026-11-15',
+    fn: async (state) => {
+      // recurringExpenses → repeatExpenses 키 이름 변경
+      if (state.recurringExpenses && !state.repeatExpenses) {
+        state.repeatExpenses = state.recurringExpenses;
+        delete state.recurringExpenses;
+      }
+      // 기존 recurringExpenses 데이터가 있고 repeatExpenses도 있는 경우 병합 (방어적)
+      else if (state.recurringExpenses && state.repeatExpenses) {
+        // ID 중복 방지하며 병합
+        const existingIds = new Set(state.repeatExpenses.map(r => r.id));
+        for (const item of state.recurringExpenses) {
+          if (!existingIds.has(item.id)) {
+            state.repeatExpenses.push(item);
+          }
+        }
+        delete state.recurringExpenses;
+      }
+      // repeatExpenses의 각 항목에 durationMonths가 없으면 무기한으로 처리 (별도 처리 불필요, undefined면 무기한)
+      return state;
+    }
+  },
 ];
 
 /**

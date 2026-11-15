@@ -115,9 +115,9 @@
       </div>
       <div class="expense-groups">
         <section class="expense-group">
-          <div class="group-head"><h3>고정지출</h3><small id="recurringExpenseCount">0건</small></div>
-          <div class="list" id="recurringExpenseList">
-            <div class="empty">등록된 고정지출이 없습니다</div>
+          <div class="group-head"><h3>반복지출</h3><small id="repeatExpenseCount">0건</small></div>
+          <div class="list" id="repeatExpenseList">
+            <div class="empty">등록된 반복지출이 없습니다</div>
           </div>
         </section>
         <section class="expense-group">
@@ -160,7 +160,7 @@
     <div class="expense-options">
       <label class="recurring-option" for="expRecurring">
         <input type="checkbox" id="expRecurring">
-        <span>고정 지출</span>
+        <span>반복 지출</span>
       </label>
       <div class="date-option">
         <span class="field-label" id="dateLabel">날짜</span>
@@ -171,8 +171,14 @@
         </button>
         <select id="expRecurringDay" aria-labelledby="dateLabel" hidden></select>
       </div>
+      <div class="duration-option" id="expDurationOption" hidden>
+        <span class="field-label" id="durationLabel">개월 수</span>
+        <input type="number" id="expDurationMonths" min="0" placeholder="무기한" autocomplete="off" aria-labelledby="durationLabel">
+        <span class="unit">개월</span>
+      </div>
     </div>
     <p class="recurring-hint" id="expRecurringHint" hidden></p>
+<p class="recurring-hint" id="expDurationHint" hidden></p>
     <div class="expense-actions">
       <div class="err" id="expErr" role="alert"></div>
       <button class="btn" id="expSave">지출 추가</button>

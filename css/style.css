@@ -114,6 +114,11 @@ input.amt{font-size:30px;font-weight:800;min-height:68px;font-variant-numeric:ta
 #expenseSheet .chip.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 12%,var(--card));color:var(--brand);font-weight:800}
 .expense-options{display:grid;grid-template-columns:minmax(105px,.8fr) minmax(0,1.6fr);gap:10px;align-items:end;margin-bottom:8px}
 .expense-options .date-option{min-width:0}
+.expense-options .duration-option{grid-column:1 / -1;justify-content:flex-start}
+@media(min-width:400px){
+  .expense-options{grid-template-columns:minmax(105px,.8fr) minmax(0,1fr) minmax(0,1fr)}
+  .expense-options .duration-option{grid-column:3}
+}
 .date-trigger{display:flex;align-items:center;justify-content:space-between;gap:4px;width:100%;min-height:46px;padding:0 12px;border:1px solid var(--line);border-radius:13px;background:var(--soft);font-size:14px;font-weight:700;text-align:left;white-space:nowrap}
 .date-trigger span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .date-trigger svg{flex-shrink:0;color:var(--brand)}
@@ -124,6 +129,10 @@ input.amt{font-size:30px;font-weight:800;min-height:68px;font-variant-numeric:ta
 #expRecurringDay{min-height:46px;border:1px solid var(--line);border-radius:13px;background:var(--soft);font-size:14px;font-weight:700}
 #expRecurringDay[hidden],#expDateTrigger[hidden]{display:none}
 .recurring-hint{margin:0 0 8px;color:var(--muted);font-size:12px}
+.duration-option{display:flex;align-items:center;gap:8px;min-height:46px}
+.duration-option input{flex:1;min-height:46px;border:1px solid var(--line);border-radius:13px;background:var(--soft);font-size:14px;font-weight:700;padding:0 12px}
+.duration-option .unit{color:var(--muted);font-size:13px;font-weight:600;white-space:nowrap}
+.duration-option[hidden]{display:none}
 .expense-actions{position:sticky;bottom:0;z-index:1;padding-top:8px;background:var(--card)}
 #expenseSheet .err{min-height:0;margin:0;font-size:13px}
 #expenseSheet .err:not(:empty){margin-bottom:6px}

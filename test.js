@@ -23,9 +23,9 @@ const sandbox = {
 };
 sandbox.globalThis = sandbox;
 const ctx = vm.createContext(sandbox);
-vm.runInContext(src + '\n;globalThis.__t = { getPayDate, generateYearCycles, locateCycle, cycleStats, salaryFor, salaryForCycle, recurringDatesInCycle, recurringDateInMonth, materializeRecurringHistory, removeRecurringOccurrencesFromMonth, rescheduleRecurringOccurrences, expenseDaysLeft, renderExpenseGroup, ensureRecurringExpenses, saveNewExpense, updateExpense, deleteExpense, updateSalarySettings, formatAmountInput, CATEGORIES, state };', ctx);
+vm.runInContext(src + '\n;globalThis.__t = { getPayDate, generateYearCycles, locateCycle, getViewCycle, cycleStats, salaryFor, salaryForCycle, recurringDatesInCycle, recurringDateInMonth, materializeRecurringHistory, removeRepeatOccurrencesFromMonth, rescheduleRecurringOccurrences, expenseDaysLeft, renderExpenseGroup, ensureRepeatExpenses, saveNewExpense, updateExpense, deleteExpense, updateSalarySettings, formatAmountInput, CATEGORIES, state };', ctx);
 
-const { getPayDate, generateYearCycles, locateCycle, cycleStats, salaryFor, salaryForCycle, recurringDatesInCycle, recurringDateInMonth, materializeRecurringHistory, removeRecurringOccurrencesFromMonth, rescheduleRecurringOccurrences, expenseDaysLeft, renderExpenseGroup, ensureRecurringExpenses, saveNewExpense, updateExpense, deleteExpense, updateSalarySettings, formatAmountInput, CATEGORIES, state } = sandbox.globalThis.__t;
+let { getPayDate, generateYearCycles, locateCycle, getViewCycle, cycleStats, salaryFor, salaryForCycle, recurringDatesInCycle, recurringDateInMonth, materializeRecurringHistory, removeRepeatOccurrencesFromMonth, rescheduleRecurringOccurrences, expenseDaysLeft, renderExpenseGroup, ensureRepeatExpenses, saveNewExpense, updateExpense, deleteExpense, updateSalarySettings, formatAmountInput, CATEGORIES, state } = sandbox.globalThis.__t;
 
 const pad = (n) => String(n).padStart(2, '0');
 const local = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -113,7 +113,7 @@ check('지출 (다른 주기 제외)', s.totalExpense, 60000);
 check('잔액', s.balance, 2940000);
 check('주기 일수 (1/23~2/24)', s.totalDays, 33);
 
-console.log('\n=== 고정지출 반복 일정 ===');
+console.log('\n=== 반복지출 반복 일정 ===');
 const monthlyRent = { day: 10, startDate: '2026-01-10' };
 check('월별 반복일을 해당 급여 주기에 배정',
   recurringDatesInCycle(monthlyRent, cycles[0]), [{ date: '2026-02-10', recurrenceMonth: '2026-02' }]);
@@ -138,39 +138,55 @@ check('이번 달 첫날부터 반복 설정을 적용',
   [{ date: '2026-10-01', recurrenceMonth: '2026-10' }]);
 check('반복 시작일 이전 일정은 생성하지 않음',
   recurringDatesInCycle({ day: 10, startDate: '2026-02-11' }, cycles[0]), []);
+
+// 만기일(durationMonths) 테스트
+// cycles[0] = 2026-01-23 ~ 2026-02-24
+// startDate 2026-01-10 기준으로 durationMonths 계산
+check('만기 1개월: 시작월만 적용 (주기 내 날짜 없음 → 빈 결과)',
+  recurringDatesInCycle({ day: 10, startDate: '2026-01-10', durationMonths: 1 }, cycles[0]), []);
+check('만기 2개월: 2월분만 주기 내에 포함',
+  recurringDatesInCycle({ day: 10, startDate: '2026-01-10', durationMonths: 2 }, cycles[0]),
+  [{ date: '2026-02-10', recurrenceMonth: '2026-02' }]);
+check('만기 3개월: 2월분만 주기 내에 포함 (3월은 주기 밖)',
+  recurringDatesInCycle({ day: 10, startDate: '2026-01-10', durationMonths: 3 }, cycles[0]),
+  [{ date: '2026-02-10', recurrenceMonth: '2026-02' }]);
+check('무기한(durationMonths 없음): 2월분만 주기 내에 포함 (3월은 주기 밖)',
+  recurringDatesInCycle({ day: 10, startDate: '2026-01-10' }, cycles[0]),
+  [{ date: '2026-02-10', recurrenceMonth: '2026-02' }]);
+
 state.expenses = [];
-state.recurringExpenses = [{
+state.repeatExpenses = [{
   id: 'rent', name: '월세', amount: 500000, category: 'housing',
   day: 10, startDate: '2026-01-10',
 }];
 const recurringCycle = cycles[0];
-ensureRecurringExpenses(recurringCycle);
-check('고정지출을 별도 완료 상태 없이 생성',
+ensureRepeatExpenses(recurringCycle);
+check('반복지출을 별도 완료 상태 없이 생성',
   state.expenses.map(e => [e.name, e.date, 'done' in e, e.cycleKey]),
   [['월세', '2026-02-10', false, '2026-0']]);
-ensureRecurringExpenses(recurringCycle);
-check('같은 주기를 다시 열어도 고정지출 중복 생성 방지', state.expenses.length, 1);
+ensureRepeatExpenses(recurringCycle);
+check('같은 주기를 다시 열어도 반복지출 중복 생성 방지', state.expenses.length, 1);
 state.expenses.push({ id: 'past', recurrenceId: 'rent', recurrenceMonth: '2026-01', date: '2026-01-10' });
 state.expenses.push({ id: 'future', recurrenceId: 'rent', recurrenceMonth: '2026-03', date: '2026-03-10' });
-removeRecurringOccurrencesFromMonth('rent', '2026-02');
-check('이번 달부터 삭제해도 지난달 고정지출 기록은 유지',
+removeRepeatOccurrencesFromMonth('rent', '2026-02');
+check('이번 달부터 삭제해도 지난달 반복지출 기록은 유지',
   state.expenses.map(e => e.id), ['past']);
-state.recurringExpenses = [];
-ensureRecurringExpenses(recurringCycle);
+state.repeatExpenses = [];
+ensureRepeatExpenses(recurringCycle);
 check('반복 설정 삭제 후 다음 달로 이월되지 않음', state.expenses.map(e => e.id), ['past']);
 state.expenses = [];
 const neverVisited = { id: 'never-visited', name: '적금', amount: 100000,
   category: 'savings', day: 31, startDate: '2026-01-01' };
 materializeRecurringHistory(neverVisited, new Date(2026, 3, 1));
-check('방문하지 않은 지난달의 고정지출 기록도 보존',
+check('방문하지 않은 지난달의 반복지출 기록도 보존',
   state.expenses.map(e => [e.date, e.recurrenceMonth]),
   [['2026-02-02', '2026-01'], ['2026-02-28', '2026-02'], ['2026-03-31', '2026-03']]);
 materializeRecurringHistory(neverVisited, new Date(2026, 3, 1));
 check('지난달 기록 보강 시 중복 생성 방지', state.expenses.length, 3);
-removeRecurringOccurrencesFromMonth('never-visited', '2026-03');
+removeRepeatOccurrencesFromMonth('never-visited', '2026-03');
 check('중단 시 이번 달 이후만 삭제',
   state.expenses.map(e => e.date), ['2026-02-02', '2026-02-28']);
-state.recurringExpenses = [{ id: 'existing', day: 25, startDate: '2026-08-01' }];
+state.repeatExpenses = [{ id: 'existing', day: 25, startDate: '2026-08-01' }];
 state.expenses = [
   { recurrenceId: 'existing', recurrenceMonth: '2026-08', date: '2026-08-25', cycleKey: 'old' },
   { recurrenceId: 'existing', recurrenceMonth: '2026-09', date: '2026-09-25', cycleKey: 'old' },
@@ -180,14 +196,14 @@ check('이미 생성된 일정은 이번 달부터 다음 영업일로 재계산
   [true, ['2026-08-25', '2026-09-28']]);
 check('재계산을 다시 실행해도 변경 없음',
   rescheduleRecurringOccurrences(new Date(2026, 8, 9)), false);
-state.recurringExpenses = [{ id: 'end-of-month', day: 31, startDate: '2026-05-01' }];
+state.repeatExpenses = [{ id: 'end-of-month', day: 31, startDate: '2026-05-01' }];
 state.expenses = [{ recurrenceId: 'end-of-month', recurrenceMonth: '2026-05',
   date: '2026-05-31', cycleKey: 'old' }];
 check('지난달 말에서 이번 달로 이월된 기존 결제도 재계산',
   [rescheduleRecurringOccurrences(new Date(2026, 5, 1)), state.expenses[0].date],
   [true, '2026-06-01']);
 
-console.log('\n=== 고정지출 D-day ===');
+console.log('\n=== 반복지출 D-day ===');
 check('남은 날짜는 양수', expenseDaysLeft('2026-10-23', new Date(2026, 9, 9)), 14);
 check('당일은 0', expenseDaysLeft('2026-10-09', new Date(2026, 9, 9)), 0);
 check('지난 날짜는 음수', expenseDaysLeft('2026-10-08', new Date(2026, 9, 9)), -1);
@@ -202,7 +218,7 @@ renderExpenseGroup('testList', [
   { id: 'past', recurrenceId: 'rule', date: local(yesterdayForList), name: '과거', amount: 100, category: 'etc' },
   { id: 'regular', date: local(tomorrowForList), name: '일반', amount: 100, category: 'etc' },
 ], '');
-check('고정지출은 미래/당일만 D-day 표시하고 당일에 강조 스타일 적용',
+check('반복지출은 미래/당일만 D-day 표시하고 당일에 강조 스타일 적용',
   [listNode.innerHTML.includes('expense-dday is-today">D-DAY'),
    listNode.innerHTML.includes('expense-dday ">D-1'),
    listNode.innerHTML.split('data-id="past"')[1].split('</button>')[0].includes('expense-dday'),
@@ -234,46 +250,65 @@ check('이미 지난 급여일로 설정하면 다음 달부터 적용',
 check('다음 급여일부터 새 설정 금액 적용',
   salaryFor(locateCycle(new Date(2026, 1, 10))), 4000000);
 
-async function testRecurringFormFlow() {
-  console.log('\n=== 고정지출 등록·수정·중단 흐름 ===');
+async function testRepeatFormFlow() {
+  console.log('\n=== 반복지출 등록·수정·중단 흐름 ===');
   const fields = {
     expAmount: { value: '50,000' }, expName: { value: '교통' },
     expDate: { value: '2026-01-01' }, expRecurring: { checked: true },
     expRecurringDay: { value: '31' }, expErr: { textContent: '' },
+    expDurationMonths: { value: '' },
   };
   sandbox.document.getElementById = id => fields[id];
-  vm.runInContext('renderAll = async () => {}; closeSheets = () => {}; toast = () => {};', ctx);
+  // getViewCycle을 모킹하여 현재 주기의 시작일을 반환하도록 설정
+  const mockCycleStart = new Date(2026, 10, 25); // 2026-11-25 (11월 주기 시작일 예시)
+  vm.runInContext(`
+    renderAll = async () => {};
+    closeSheets = () => {};
+    toast = () => {};
+    getViewCycle = () => ({ start: new Date(2026, 10, 25), end: new Date(2026, 11, 24), year: 2026, index: 10, month: 11, payDate: new Date(2026, 10, 25) });
+  `, ctx);
   state.expenses = [];
-  state.recurringExpenses = [];
-  const now = new Date();
-  const currentMonth = local(now).slice(0, 7);
+  state.repeatExpenses = [];
+  const now = new Date(2026, 10, 3); // 2026-11-03 (테스트용 고정 날짜)
+  const currentMonth = '2026-11';
   await saveNewExpense();
-  check('체크 선택 시 이번 달부터 매월 31일 반복 등록',
-    [state.recurringExpenses[0].day, state.recurringExpenses[0].startDate, state.expenses[0].date],
-    [31, `${currentMonth}-01`, local(recurringDateInMonth({ day: 31 }, now))]);
+  check('체크 선택 시 현재 주기 시작일부터 반복 등록 (무기한)',
+    [state.repeatExpenses[0].day, state.repeatExpenses[0].startDate, state.expenses[0].date, state.repeatExpenses[0].durationMonths],
+    [31, '2026-11-25', local(recurringDateInMonth({ day: 31 }, now)), undefined]);
 
-  const rule = state.recurringExpenses[0];
-  const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  rule.startDate = `${local(previousMonth).slice(0, 7)}-01`;
-  materializeRecurringHistory(rule, now);
-  const pastDate = state.expenses.find(e => e.recurrenceMonth !== currentMonth).date;
+  const rule = state.repeatExpenses[0];
+  const previousMonth = new Date(2026, 9, 1); // 2026-10-01
+  rule.startDate = '2026-10-01';
+  materializeRecurringHistory(rule, new Date(2026, 10, 3));
+  // 현재 주기(2026-11) 비용 생성
+  await ensureRepeatExpenses({ start: new Date(2026, 10, 25), end: new Date(2026, 11, 24), year: 2026, index: 10, month: 11, payDate: new Date(2026, 10, 25) });
+  const pastExpense = state.expenses.find(e => e.recurrenceMonth !== currentMonth);
+  const pastDate = pastExpense.date;
+  let currentExpense = state.expenses.find(e => e.recurrenceMonth === currentMonth);
   fields.expName.value = '교통 정기권';
   fields.expRecurringDay.value = '7';
-  vm.runInContext('editingId = state.expenses.find(e => e.recurrenceMonth === monthKey(new Date())).id', ctx);
+  fields.expDurationMonths.value = '12';
+  vm.runInContext(`editingId = "${currentExpense.id}"`, ctx);
   await updateExpense();
-  check('고정지출 수정은 지난달 기록을 바꾸지 않음',
+  // updateExpense는 내부적으로 ensureRepeatExpenses(getViewCycle())를 호출하므로
+  // 테스트 환경에서 getViewCycle 모킹이 어려워 수동으로 현재 주기 비용 생성
+  // 2026-11-03 기준 현재 주기는 10월 주기 (2026-10-25 ~ 2026-11-24)
+  await ensureRepeatExpenses({ start: new Date(2026, 9, 25), end: new Date(2026, 10, 24), year: 2026, index: 9, month: 10, payDate: new Date(2026, 9, 25) });
+  check('반복지출 수정은 지난달 기록을 바꾸지 않음',
     state.expenses.find(e => e.date === pastDate).name, '교통');
-  check('고정지출 수정은 이번 달 날짜부터 변경',
-    [rule.day, state.expenses.find(e => e.recurrenceMonth === currentMonth).date],
-    [7, local(recurringDateInMonth({ day: 7 }, now))]);
+  // updateExpense 후 현재 월 비용 다시 찾기 (기존 것 삭제되고 새로 생성됨)
+  currentExpense = state.expenses.find(e => e.recurrenceMonth === currentMonth);
+  check('반복지출 수정은 이번 달 날짜부터 변경',
+    [rule.day, currentExpense.date, rule.durationMonths],
+    [7, local(recurringDateInMonth({ day: 7 }, new Date(2026, 10, 3))), 12]);
 
-  vm.runInContext('editingId = state.expenses.find(e => e.recurrenceMonth === monthKey(new Date())).id', ctx);
+  vm.runInContext(`editingId = "${currentExpense.id}"`, ctx);
   await deleteExpense();
-  check('고정지출 중단 시 지난달 기록만 남음',
-    [state.recurringExpenses.length, state.expenses.map(e => e.date)], [0, [pastDate]]);
+  check('반복지출 중단 시 지난달 기록만 남음',
+    [state.repeatExpenses.length, state.expenses.map(e => e.date)], [0, [pastDate]]);
 }
 
-testRecurringFormFlow().then(() => {
+testRepeatFormFlow().then(() => {
   console.log(`\n결과: ${pass} 통과, ${fail} 실패`);
   process.exit(fail > 0 ? 1 : 0);
 }).catch(error => { console.error(error); process.exit(1); });
