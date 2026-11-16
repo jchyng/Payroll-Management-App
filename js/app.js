@@ -36,11 +36,24 @@ const CATEGORIES = [
 ];
 const catOf = (id) => CATEGORIES.find(c => c.id === id) || CATEGORIES[CATEGORIES.length - 1];
 
+// 수익 카테고리
+const INCOME_CATEGORIES = [
+  { id: 'salary',        label: '급여',     emoji: '💰' },
+  { id: 'bonus',         label: '보너스',   emoji: '🎁' },
+  { id: 'taxRefund',     label: '연말정산', emoji: '📋' },
+  { id: 'allowance',     label: '용돈/지원', emoji: '👨‍👩‍👧' },
+  { id: 'investment',    label: '투자/이자', emoji: '📈' },
+  { id: 'etcIncome',     label: '기타',     emoji: '✨' },
+];
+const incomeCatOf = (id) => INCOME_CATEGORIES.find(c => c.id === id) || INCOME_CATEGORIES[INCOME_CATEGORIES.length - 1];
+
 /* ============ 상태 ============ */
 let state = { payDay: 25, salaryHistory: [], incomes: [], expenses: [], repeatExpenses: [] };
-let view = null;          // 보고 있는 주기 {year, index}
-let editingId = null;     // 수정 중인 지출 id
-let selectedCat = 'food'; // 시트에서 선택된 카테고리
+let view = null;              // 보고 있는 주기 {year, index}
+let editingId = null;         // 수정 중인 지출 id
+let editingIncomeId = null;   // 수정 중인 수익 id
+let selectedCat = 'food';     // 지출 시트에서 선택된 카테고리
+let selectedIncomeCat = 'bonus'; // 수익 시트에서 선택된 카테고리
 
 /* ============ 유틸 ============ */
 const $ = (id) => document.getElementById(id);
@@ -409,6 +422,9 @@ async function renderAll() {
   salaryButton.textContent = hasSalary ? '급여 수정' : '급여 입력';
   salaryButton.setAttribute('aria-label', hasSalary ? '급여 수정' : '급여 입력');
 
+  // 수익 리스트
+  renderIncomes(s.incomes);
+
   // 지출 리스트
   renderExpenses(s.expenses);
 }
@@ -422,6 +438,42 @@ function renderExpenses(expenses) {
   $('regularExpenseCount').textContent = `${regular.length}건`;
   renderExpenseGroup('repeatExpenseList', repeat, '등록된 반복지출이 없습니다');
   renderExpenseGroup('regularExpenseList', regular, '등록된 지출이 없습니다');
+}
+
+function renderIncomes(incomes) {
+  $('incomeCount').textContent = `${incomes.length}건`;
+  renderIncomeList('incomeList', incomes, '등록된 수익이 없습니다');
+}
+
+function renderIncomeList(listId, incomes, emptyMessage) {
+  const list = $(listId);
+  if (incomes.length === 0) {
+    list.innerHTML = `<div class="empty">${emptyMessage}</div>`;
+    return;
+  }
+
+  const sorted = [...incomes].sort((a, b) => b.date.localeCompare(a.date));
+  list.innerHTML = sorted.map(inc => {
+    const cat = incomeCatOf(inc.category);
+    return `
+      <button type="button" class="row income-row" data-id="${escapeHtml(inc.id)}" aria-label="${escapeHtml(inc.name)}, +${fmtMoney(inc.amount)}원, ${escapeHtml(inc.date)}, ${cat.label}, 수정">
+        <span class="ic" aria-hidden="true">${cat.emoji}</span>
+        <span class="main">
+          <span class="row-top">
+            <span class="t">${escapeHtml(inc.name)}</span>
+            <span class="a income-amount">+${fmtMoney(inc.amount)}원</span>
+          </span>
+          <span class="row-bottom">
+            <span class="s">${escapeHtml(inc.date)} · ${cat.label}</span>
+          </span>
+        </span>
+      </button>`;
+  }).join('');
+
+  // 행 클릭 → 수정 시트
+  list.querySelectorAll('.row').forEach(row => {
+    row.addEventListener('click', () => openEditIncome(row.dataset.id));
+  });
 }
 
 function renderExpenseGroup(listId, expenses, emptyMessage) {
@@ -477,6 +529,7 @@ function closeSheets() {
   document.querySelectorAll('.sheet').forEach(s => s.classList.remove('on'));
   document.body.classList.remove('modal-open');
   editingId = null;
+  editingIncomeId = null;
 }
 
 /* ============ 급여일 칩 ============ */
@@ -511,8 +564,10 @@ function buildCatChips() {
   });
 }
 
-/* ============ 지출 날짜 선택 ============ */
+/* ============ 날짜 선택 (지출/수익 공용) ============ */
 let calendarView = null;
+let calendarTarget = { inputId: 'expDate', textId: 'expDateText', triggerId: 'expDateTrigger', sheetId: 'expenseSheet' };
+
 function syncExpenseDateUI() {
   const recurring = $('expRecurring').checked;
   $('dateLabel').textContent = recurring ? '매월 지출일' : '날짜';
@@ -532,19 +587,22 @@ function syncExpenseDateUI() {
   }
 }
 
-function setExpenseDate(value) {
-  $('expDate').value = value;
+function setDateInput(inputId, textId, value) {
+  $(inputId).value = value;
   const date = parseDate(value);
   const weekday = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
-  $('expDateText').textContent = `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())} (${weekday})`;
+  $(textId).textContent = `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())} (${weekday})`;
 }
+
+function setExpenseDate(value) { setDateInput('expDate', 'expDateText', value); }
+function setIncomeDate(value) { setDateInput('incomeDate', 'incomeDateText', value); }
 
 function renderCalendar() {
   const { year, month } = calendarView;
   $('calendarMonth').textContent = `${year}년 ${month + 1}월`;
   const firstWeekday = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const selected = $('expDate').value;
+  const selected = $(calendarTarget.inputId).value;
   const today = fmtDate(new Date());
   const blankDays = Array.from({ length: firstWeekday }, () => '<span aria-hidden="true"></span>');
   const days = Array.from({ length: daysInMonth }, (_, index) => {
@@ -556,20 +614,21 @@ function renderCalendar() {
   $('calendarDays').innerHTML = [...blankDays, ...days].join('');
 }
 
-function openCalendar() {
-  const date = parseDate($('expDate').value || fmtDate(new Date()));
+function openCalendar(inputId, textId, triggerId, sheetId) {
+  calendarTarget = { inputId, textId, triggerId, sheetId };
+  const date = parseDate($(inputId).value || fmtDate(new Date()));
   calendarView = { year: date.getFullYear(), month: date.getMonth() };
   renderCalendar();
   $('calendarOverlay').hidden = false;
-  $('expenseSheet').inert = true;
+  $(sheetId).inert = true;
   $('calendarClose').focus();
 }
 
 function closeCalendar(restoreFocus = true) {
   if ($('calendarOverlay').hidden) return;
   $('calendarOverlay').hidden = true;
-  $('expenseSheet').inert = false;
-  if (restoreFocus) $('expDateTrigger').focus();
+  $(calendarTarget.sheetId).inert = false;
+  if (restoreFocus) $(calendarTarget.triggerId).focus();
 }
 
 function moveCalendarMonth(offset) {
@@ -706,6 +765,92 @@ async function deleteExpense() {
   toast(stoppedRepeat ? '이번 달부터 반복 지출이 중단되었습니다' : '삭제되었습니다');
 }
 
+/* ============ 수익 추가/수정 (급여 제외) ============ */
+function buildIncomeCatChips() {
+  $('incomeCatChips').innerHTML = INCOME_CATEGORIES.map(c =>
+    `<button type="button" class="chip ${c.id === selectedIncomeCat ? 'on' : ''}" data-cat="${c.id}" aria-pressed="${c.id === selectedIncomeCat}">${c.emoji} ${c.label}</button>`
+  ).join('');
+  $('incomeCatChips').querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      selectedIncomeCat = chip.dataset.cat;
+      $('incomeCatChips').querySelectorAll('.chip').forEach(x => {
+        const active = x === chip;
+        x.classList.toggle('on', active);
+        x.setAttribute('aria-pressed', active);
+      });
+    });
+  });
+}
+
+function openAddIncome() {
+  editingIncomeId = null;
+  $('incomeSheetTitle').textContent = '수익 추가';
+  $('incomeSave').style.display = '';
+  $('incomeFoot').style.display = 'none';
+  $('incomeAmount').value = '';
+  $('incomeName').value = '';
+  setIncomeDate(fmtDate(new Date()));
+  $('incomeErr').textContent = '';
+  selectedIncomeCat = 'bonus';
+  buildIncomeCatChips();
+  openSheet('incomeSheet');
+  setTimeout(() => $('incomeAmount').focus(), 250);
+}
+
+function openEditIncome(id) {
+  const inc = state.incomes.find(x => x.id === id);
+  if (!inc || inc.type === 'salary') return;
+  editingIncomeId = id;
+  $('incomeSheetTitle').textContent = '수익 수정';
+  $('incomeSave').style.display = 'none';
+  $('incomeFoot').style.display = '';
+  $('incomeAmount').value = formatAmountInput(inc.amount);
+  $('incomeName').value = inc.name;
+  setIncomeDate(inc.date);
+  $('incomeErr').textContent = '';
+  selectedIncomeCat = inc.category || 'bonus';
+  buildIncomeCatChips();
+  openSheet('incomeSheet');
+  setTimeout(() => $('incomeAmount').focus(), 250);
+}
+
+function readIncomeForm() {
+  const amount = parseInt(digits($('incomeAmount').value), 10);
+  const name = $('incomeName').value.trim() || incomeCatOf(selectedIncomeCat).label;
+  if (!amount || amount <= 0) { $('incomeErr').textContent = '금액을 입력하세요'; return null; }
+  const date = $('incomeDate').value;
+  if (!date) { $('incomeErr').textContent = '날짜를 선택하세요'; return null; }
+  return { amount, name, date, category: selectedIncomeCat };
+}
+
+async function saveNewIncome() {
+  const f = readIncomeForm(); if (!f) return;
+  const c = locateCycle(parseDate(f.date));
+  state.incomes.push({ id: uid(), type: 'income', ...f, cycleKey: cycleKey(c) });
+  await saveState(); closeSheets(); await renderAll();
+  toast(`${f.name} ${fmtMoney(f.amount)}원 추가`);
+}
+
+async function updateIncome() {
+  const f = readIncomeForm(); if (!f) return;
+  const inc = state.incomes.find(x => x.id === editingIncomeId);
+  if (!inc) return;
+  const c = locateCycle(parseDate(f.date));
+  Object.assign(inc, f, { cycleKey: cycleKey(c) });
+  await saveState(); closeSheets(); await renderAll();
+  toast('수정되었습니다');
+}
+
+async function deleteIncome() {
+  if (!editingIncomeId) return;
+  const income = state.incomes.find(x => x.id === editingIncomeId);
+  if (!income || income.type === 'salary') return;
+  if (!confirm('이 수익 내역을 삭제할까요?')) return;
+  state.incomes = state.incomes.filter(x => x.id !== editingIncomeId);
+  await saveState(); closeSheets(); await renderAll();
+  toast('삭제되었습니다');
+}
+
 /* ============ 급여 입력 ============ */
 function openIncome() {
   const c = getViewCycle();
@@ -714,7 +859,7 @@ function openIncome() {
   $('incErr').textContent = '';
   $('incReset').style.display = override ? '' : 'none';
   syncPayDayUI(state.payDay);
-  openSheet('incomeSheet');
+  openSheet('salarySheet');
   setTimeout(() => $('incAmount').focus(), 250);
 }
 
@@ -801,7 +946,7 @@ async function init() {
   ).join('');
 
   // 금액 입력: 숫자만
-  ['expAmount', 'incAmount'].forEach(id => {
+  ['expAmount', 'incAmount', 'incomeAmount'].forEach(id => {
     $(id).addEventListener('input', (e) => formatAmountInputValue(e.target));
   });
 
@@ -810,19 +955,20 @@ async function init() {
   $('nextCycle').addEventListener('click', () => navigate(1));
   $('addExpenseBtn').addEventListener('click', openAddExpense);
   $('addIncomeBtn').addEventListener('click', openIncome);
+  $('addGeneralIncomeBtn').addEventListener('click', openAddIncome);
   $('clearBtn').addEventListener('click', clearCycle);
   $('expSave').addEventListener('click', saveNewExpense);
   $('expUpdate').addEventListener('click', updateExpense);
   $('expDelete').addEventListener('click', deleteExpense);
   $('expClose').addEventListener('click', closeSheets);
-  $('expDateTrigger').addEventListener('click', openCalendar);
+  $('expDateTrigger').addEventListener('click', () => openCalendar('expDate', 'expDateText', 'expDateTrigger', 'expenseSheet'));
   $('calendarClose').addEventListener('click', () => closeCalendar());
   $('calendarPrev').addEventListener('click', () => moveCalendarMonth(-1));
   $('calendarNext').addEventListener('click', () => moveCalendarMonth(1));
-  $('calendarToday').addEventListener('click', () => { setExpenseDate(fmtDate(new Date())); closeCalendar(); });
+  $('calendarToday').addEventListener('click', () => { setDateInput(calendarTarget.inputId, calendarTarget.textId, fmtDate(new Date())); closeCalendar(); });
   $('calendarDays').addEventListener('click', (event) => {
     const day = event.target.closest('button[data-date]');
-    if (day) { setExpenseDate(day.dataset.date); closeCalendar(); }
+    if (day) { setDateInput(calendarTarget.inputId, calendarTarget.textId, day.dataset.date); closeCalendar(); }
   });
   $('calendarOverlay').addEventListener('click', (event) => {
     if (event.target === $('calendarOverlay')) closeCalendar();
@@ -833,6 +979,12 @@ async function init() {
     if (event.shiftKey && document.activeElement === buttons[0]) { event.preventDefault(); buttons.at(-1).focus(); }
     else if (!event.shiftKey && document.activeElement === buttons.at(-1)) { event.preventDefault(); buttons[0].focus(); }
   });
+  // 수익 시트 이벤트
+  $('incomeSave').addEventListener('click', saveNewIncome);
+  $('incomeUpdate').addEventListener('click', updateIncome);
+  $('incomeDelete').addEventListener('click', deleteIncome);
+  $('incomeClose').addEventListener('click', closeSheets);
+  $('incomeDateTrigger').addEventListener('click', () => openCalendar('incomeDate', 'incomeDateText', 'incomeDateTrigger', 'incomeSheet'));
   $('incSave').addEventListener('click', saveIncome);
   $('incReset').addEventListener('click', resetIncome);
   $('loadPreviousIncomeSalary').addEventListener('click', () => loadPreviousSalary('incAmount'));

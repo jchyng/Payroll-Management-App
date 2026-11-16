@@ -29,7 +29,10 @@ button:active{transform:scale(.97)}
 .lg div{font-size:12px;color:rgba(255,255,255,.62)}
 .lg b{display:block;font-size:14px;color:#fff;font-variant-numeric:tabular-nums;margin-top:1px}
 .lg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+.salary-actions{display:flex;gap:8px}
 .salary-action{display:inline-grid;place-items:center;flex-shrink:0;min-height:40px;padding:0 14px;border:1px solid rgba(255,255,255,.28);border-radius:13px;color:#fff;font-size:13px;font-weight:700;white-space:nowrap}
+.salary-action.secondary{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2)}
+.salary-action.secondary:active{background:rgba(255,255,255,.2)}
 .d3{background:#3DD6A6}
 .hero .salary-action:active{background:rgba(255,255,255,.16)}
 .sec{margin-top:30px}
@@ -163,3 +166,28 @@ input.amt{font-size:30px;font-weight:800;min-height:68px;font-variant-numeric:ta
 .payday-chips .chip{min-height:40px;padding:0 14px;border-radius:20px;background:var(--soft);font-size:14px;font-weight:600;color:var(--ink);border:none;cursor:pointer;transition:background .15s,color .15s,transform .1s}
 .payday-chips .chip.on{background:var(--brand);color:var(--on)}
 .payday-chips .chip:active{transform:scale(.9)}
+
+/* 수익 시트 스타일 */
+#incomeSheet{padding:10px 22px calc(14px + env(safe-area-inset-bottom));overscroll-behavior:contain}
+#incomeSheet::before{margin-bottom:8px}
+#incomeSheet .expense-heading{margin-bottom:12px}
+#incomeSheet h3{margin:0;font-size:21px}
+#incomeSheet .f{margin-bottom:11px}
+#incomeSheet .f>span,.field-label{display:block;margin-bottom:5px;color:var(--muted);font-size:13px;font-weight:700}
+#incomeSheet input[type=text]{min-height:48px;border-radius:14px}
+#incomeSheet input.amt{min-height:60px;font-size:32px;background:color-mix(in srgb,var(--brand) 7%,var(--soft))}
+#incomeSheet .amt-box .unit{font-size:19px}
+#incomeSheet .chips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0}
+#incomeSheet .chip{min-width:0;min-height:38px;padding:0 4px;border:1px solid var(--line);border-radius:12px;background:var(--soft);font-size:13px;white-space:nowrap}
+#incomeSheet .chip.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 12%,var(--card));color:var(--brand);font-weight:800}
+#incomeSheet .date-option{margin-bottom:8px}
+#incomeSheet .date-trigger{width:100%}
+#incomeSheet .expense-actions{position:sticky;bottom:0;z-index:1;padding-top:8px;background:var(--card)}
+#incomeSheet .err{min-height:0;margin:0;font-size:13px}
+#incomeSheet .err:not(:empty){margin-bottom:6px}
+#incomeSheet .btn{min-height:50px;border-radius:14px}
+#incomeSheet .foot{margin-top:0}
+
+/* 수익 행 스타일 (초록색 양수 금액) */
+.income-row .income-amount{color:var(--brand)}
+.income-row .ic{background:color-mix(in srgb,var(--brand) 12%,var(--soft))}
